@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BorderFlow Control Tower</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: 'Segoe UI', sans-serif; background: #0f172a; color: #e2e8f0; }
+  header { background: #1e293b; padding: 1rem 2rem; display: flex; align-items: center; gap: 1rem; border-bottom: 2px solid #3b82f6; }
+  header h1 { font-size: 1.5rem; color: #3b82f6; }
+  header span { color: #94a3b8; font-size: 0.9rem; }
+  .status-dot { width: 10px; height: 10px; border-radius: 50%; background: #22c55e; display: inline-block; animation: pulse 2s infinite; }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+  main { padding: 2rem; max-width: 1400px; margin: 0 auto; }
+  .kpi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 1rem; margin-bottom: 2rem; }
+  .kpi { background: #1e293b; border: 1px solid #334155; border-radius: 10px; padding: 1.2rem; text-align: center; }
+  .kpi .number { font-size: 2.5rem; font-weight: bold; color: #3b82f6; }
+  .kpi .label { font-size: 0.8rem; color: #94a3b8; margin-top: 0.3rem; text-transform: uppercase; }
+  .section { background: #1e293b; border: 1px solid #334155; border-radius: 10px; padding: 1.5rem; margin-bottom: 1.5rem; }
+  .section h2 { color: #3b82f6; margin-bottom: 1rem; font-size: 1rem; text-transform: uppercase; letter-spacing: 0.05em; }
+  table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+  th { background: #0f172a; color: #64748b; padding: 0.6rem 0.8rem; text-align: left; font-weight: 600; }
+  td { padding: 0.6rem 0.8rem; border-bottom: 1px solid #1e293b; }
+  tr:hover td { background: #0f172a55; }
+  .badge { display: inline-block; padding: 2px 8px; border-radius: 12px; font-size: 0.75rem; font-weight: 600; }
+  .badge-green { background: #14532d; color: #4ade80; }
+  .badge-blue { background: #1e3a5f; color: #60a5fa; }
+  .badge-yellow { background: #451a03; color: #fbbf24; }
+  .badge-red { background: #450a0a; color: #f87171; }
+  .badge-gray { background: #1e293b; color: #94a3b8; }
+  .refresh-btn { background: #3b82f6; color: white; border: none; padding: 0.5rem 1.2rem; border-radius: 6px; cursor: pointer; font-size: 0.85rem; margin-left: auto; }
+  .refresh-btn:hover { background: #2563eb; }
+  .flex-between { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; }
+  .sites-row { display: flex; gap: 1rem; flex-wrap: wrap; margin-bottom: 1.5rem; }
+  .site-card { flex: 1; min-width: 140px; background: #0f172a; border: 1px solid #334155; border-radius: 8px; padding: 1rem; text-align: center; }
+  .site-card .site-name { font-size: 0.8rem; color: #94a3b8; margin-bottom: 0.3rem; }
+  .site-card .site-count { font-size: 1.8rem; font-weight: bold; color: #a78bfa; }
+  #last-updated { color: #64748b; font-size: 0.8rem; }
+</style>
+</head>
+<body>
+<header>
+  <span class="status-dot"></span>
+  <h1>🏗 BorderFlow</h1>
+  <span>Control Tower — Global View</span>
+  <span id="last-updated" style="margin-left:auto">Loading...</span>
+</header>
+<main>
+  <div class="kpi-grid" id="kpi-grid">
+    <div class="kpi"><div class="number" id="kpi-total">—</div><div class="label">Total Containers</div></div>
+    <div class="kpi"><div class="number" id="kpi-transit" style="color:#60a5fa">—</div><div class="label">In Transit</div></div>
+    <div class="kpi"><div class="number" id="kpi-delivered" style="color:#4ade80">—</div><div class="label">Delivered</div></div>
+    <div class="kpi"><div class="number" id="kpi-incidents" style="color:#f87171">—</div><div class="label">Incidents</div></div>
+    <div class="kpi"><div class="number" id="kpi-syncs" style="color:#a78bfa">—</div><div class="label">Sync Events</div></div>
+  </div>
+
+  <div class="section">
+    <h2>📍 Containers by Site</h2>
+    <div class="sites-row" id="sites-row"><em style="color:#64748b">Loading...</em></div>
+  </div>
+
+  <div class="section">
+    <div class="flex-between">
+      <h2 style="margin:0">📦 All Containers</h2>
+      <button class="refresh-btn" onclick="loadAll()">↻ Refresh</button>
+    </div>
+    <table id="containers-table">
+      <thead><tr>
+        <th>Reference</th><th>Client</th><th>Status</th>
+        <th>Current Site</th><th>Origin → Destination</th><th>Last Updated</th>
+      </tr></thead>
+      <tbody id="containers-body"><tr><td colspan="6" style="color:#64748b">Loading...</td></tr></tbody>
+    </table>
+  </div>
+
+  <div class="section">
+    <h2>🔄 Recent Sync Events</h2>
+    <table id="sync-table">
+      <thead><tr><th>Site</th><th>Operations</th><th>Conflicts Resolved</th><th>Time</th></tr></thead>
+      <tbody id="sync-body"><tr><td colspan="4" style="color:#64748b">Loading...</td></tr></tbody>
+    </table>
+  </div>
+</main>
+
+<script>
+const statusBadge = (s) => {
+  const map = {
+    REGISTERED: 'badge-gray', IN_TRANSIT: 'badge-blue',
+    AT_BORDER: 'badge-yellow', CLEARED: 'badge-green',
+    AT_PORT: 'badge-blue', DELIVERED: 'badge-green',
+    EXCEPTION: 'badge-red'
+  };
+  return `<span class="badge ${map[s] || 'badge-gray'}">${s}</span>`;
+};
+
+const siteName = (id) => ({
+  depot: '🏭 Depot', border: '🛂 Border', port: '⚓ Port', hub: '🏠 Hub'
+}[id] || id);
+
+async function loadAll() {
+  try {
+    const [kpis, containers, syncLog] = await Promise.all([
+      fetch('/kpis').then(r => r.json()),
+      fetch('/containers').then(r => r.json()),
+      fetch('/sync/log').then(r => r.json())
+    ]);
+
+    // KPIs
+    document.getElementById('kpi-total').textContent = kpis.total_containers || 0;
+    document.getElementById('kpi-transit').textContent = kpis.in_transit || 0;
+    document.getElementById('kpi-delivered').textContent = kpis.delivered || 0;
+    document.getElementById('kpi-incidents').textContent = kpis.total_incidents || 0;
+    document.getElementById('kpi-syncs').textContent = kpis.total_syncs || 0;
+
+    // Sites
+    const sitesRow = document.getElementById('sites-row');
+    const siteNames = ['depot','border','port','hub'];
+    sitesRow.innerHTML = siteNames.map(s => {
+      const found = (kpis.containers_by_site || []).find(x => x.current_site === s);
+      return `<div class="site-card"><div class="site-name">${siteName(s)}</div><div class="site-count">${found ? found.count : 0}</div></div>`;
+    }).join('');
+
+    // Containers
+    const tbody = document.getElementById('containers-body');
+    if (!containers.length) {
+      tbody.innerHTML = '<tr><td colspan="6" style="color:#64748b">No containers yet. Use the site APIs to register containers.</td></tr>';
+    } else {
+      tbody.innerHTML = containers.map(c => `
+        <tr>
+          <td style="font-family:monospace;color:#a78bfa">${c.reference || '—'}</td>
+          <td>${c.client_name || '—'}</td>
+          <td>${statusBadge(c.status)}</td>
+          <td>${siteName(c.current_site)}</td>
+          <td>${c.origin || '—'} → ${c.destination || '—'}</td>
+          <td style="color:#64748b;font-size:0.8rem">${(c.updated_at||'').replace('T',' ').substring(0,19)}</td>
+        </tr>`).join('');
+    }
+
+    // Sync log
+    const syncBody = document.getElementById('sync-body');
+    if (!syncLog.length) {
+      syncBody.innerHTML = '<tr><td colspan="4" style="color:#64748b">No sync events yet</td></tr>';
+    } else {
+      syncBody.innerHTML = syncLog.slice(0,20).map(s => `
+        <tr>
+          <td>${siteName(s.site_id)}</td>
+          <td>${s.operations_count}</td>
+          <td>${s.conflicts_detected > 0 ? `<span style="color:#fbbf24">${s.conflicts_detected}</span>` : '0'}</td>
+          <td style="color:#64748b;font-size:0.8rem">${(s.received_at||'').replace('T',' ').substring(0,19)}</td>
+        </tr>`).join('');
+    }
+
+    document.getElementById('last-updated').textContent = 'Updated: ' + new Date().toLocaleTimeString();
+  } catch(e) {
+    console.error('Failed to load data:', e);
+  }
+}
+
+loadAll();
+setInterval(loadAll, 5000); // auto-refresh every 5s
+</script>
+</body>
+</html>

@@ -1,0 +1,235 @@
+# ── Depot ─────────────────────────────────────────────────────────────────────
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: depot-pvc
+spec:
+  accessModes: [ReadWriteOnce]
+  resources:
+    requests:
+      storage: 500Mi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: depot
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: depot
+  template:
+    metadata:
+      labels:
+        app: depot
+    spec:
+      containers:
+      - name: depot
+        image: borderflow-site:latest
+        imagePullPolicy: Never
+        env:
+        - name: SITE_ID
+          value: depot
+        - name: SITE_NAME
+          value: "Origin Depot (Maseru)"
+        - name: CONTROL_TOWER_URL
+          value: http://control-tower:8000
+        ports:
+        - containerPort: 8000
+        volumeMounts:
+        - name: depot-storage
+          mountPath: /data
+      volumes:
+      - name: depot-storage
+        persistentVolumeClaim:
+          claimName: depot-pvc
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: depot
+spec:
+  selector:
+    app: depot
+  ports:
+  - port: 8000
+    targetPort: 8000
+    nodePort: 30001
+  type: NodePort
+---
+# ── Border Post ────────────────────────────────────────────────────────────────
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: border-pvc
+spec:
+  accessModes: [ReadWriteOnce]
+  resources:
+    requests:
+      storage: 500Mi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: border
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: border
+  template:
+    metadata:
+      labels:
+        app: border
+    spec:
+      containers:
+      - name: border
+        image: borderflow-site:latest
+        imagePullPolicy: Never
+        env:
+        - name: SITE_ID
+          value: border
+        - name: SITE_NAME
+          value: "Border Post (Maseru Bridge)"
+        - name: CONTROL_TOWER_URL
+          value: http://control-tower:8000
+        ports:
+        - containerPort: 8000
+        volumeMounts:
+        - name: border-storage
+          mountPath: /data
+      volumes:
+      - name: border-storage
+        persistentVolumeClaim:
+          claimName: border-pvc
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: border
+spec:
+  selector:
+    app: border
+  ports:
+  - port: 8000
+    targetPort: 8000
+    nodePort: 30002
+  type: NodePort
+---
+# ── Port ───────────────────────────────────────────────────────────────────────
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: port-pvc
+spec:
+  accessModes: [ReadWriteOnce]
+  resources:
+    requests:
+      storage: 500Mi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: port
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: port
+  template:
+    metadata:
+      labels:
+        app: port
+    spec:
+      containers:
+      - name: port
+        image: borderflow-site:latest
+        imagePullPolicy: Never
+        env:
+        - name: SITE_ID
+          value: port
+        - name: SITE_NAME
+          value: "Port Site (Durban)"
+        - name: CONTROL_TOWER_URL
+          value: http://control-tower:8000
+        ports:
+        - containerPort: 8000
+        volumeMounts:
+        - name: port-storage
+          mountPath: /data
+      volumes:
+      - name: port-storage
+        persistentVolumeClaim:
+          claimName: port-pvc
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: port
+spec:
+  selector:
+    app: port
+  ports:
+  - port: 8000
+    targetPort: 8000
+    nodePort: 30003
+  type: NodePort
+---
+# ── Destination Hub ────────────────────────────────────────────────────────────
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: hub-pvc
+spec:
+  accessModes: [ReadWriteOnce]
+  resources:
+    requests:
+      storage: 500Mi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: hub
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: hub
+  template:
+    metadata:
+      labels:
+        app: hub
+    spec:
+      containers:
+      - name: hub
+        image: borderflow-site:latest
+        imagePullPolicy: Never
+        env:
+        - name: SITE_ID
+          value: hub
+        - name: SITE_NAME
+          value: "Destination Hub (Johannesburg)"
+        - name: CONTROL_TOWER_URL
+          value: http://control-tower:8000
+        ports:
+        - containerPort: 8000
+        volumeMounts:
+        - name: hub-storage
+          mountPath: /data
+      volumes:
+      - name: hub-storage
+        persistentVolumeClaim:
+          claimName: hub-pvc
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: hub
+spec:
+  selector:
+    app: hub
+  ports:
+  - port: 8000
+    targetPort: 8000
+    nodePort: 30004
+  type: NodePort

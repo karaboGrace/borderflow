@@ -1,0 +1,19 @@
+# NetworkPolicy to simulate Border Post going OFFLINE
+# Apply this to block border → control-tower communication
+# kubectl apply -f network-partition.yaml   ← makes border offline
+# kubectl delete -f network-partition.yaml  ← restores connectivity
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: border-partition
+  namespace: default
+spec:
+  podSelector:
+    matchLabels:
+      app: border
+  policyTypes:
+  - Egress
+  egress:
+  # Only allow talking to postgres (not control-tower) — simulates partition
+  - ports:
+    - port: 5432

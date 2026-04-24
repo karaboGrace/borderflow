@@ -1,0 +1,98 @@
+version: "3.9"
+
+services:
+  # ── PostgreSQL (Control Tower DB) ────────────────────────────────────────────
+  postgres:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_DB: borderflow
+      POSTGRES_USER: borderflow
+      POSTGRES_PASSWORD: borderflow
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U borderflow"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  # ── Control Tower ─────────────────────────────────────────────────────────────
+  control-tower:
+    build: ./control_tower
+    environment:
+      DATABASE_URL: postgresql://borderflow:borderflow@postgres:5432/borderflow
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # ── Origin Depot (Maseru) ─────────────────────────────────────────────────────
+  depot:
+    build: ./site_service
+    environment:
+      SITE_ID: depot
+      SITE_NAME: "Origin Depot (Maseru)"
+      CONTROL_TOWER_URL: http://control-tower:8000
+    ports:
+      - "8001:8000"
+    volumes:
+      - depot_data:/data
+    depends_on:
+      - control-tower
+    restart: unless-stopped
+
+  # ── Border Post (Maseru Bridge) ───────────────────────────────────────────────
+  border:
+    build: ./site_service
+    environment:
+      SITE_ID: border
+      SITE_NAME: "Border Post (Maseru Bridge)"
+      CONTROL_TOWER_URL: http://control-tower:8000
+    ports:
+      - "8002:8000"
+    volumes:
+      - border_data:/data
+    depends_on:
+      - control-tower
+    restart: unless-stopped
+
+  # ── Port (Durban) ─────────────────────────────────────────────────────────────
+  port:
+    build: ./site_service
+    environment:
+      SITE_ID: port
+      SITE_NAME: "Port Site (Durban)"
+      CONTROL_TOWER_URL: http://control-tower:8000
+    ports:
+      - "8003:8000"
+    volumes:
+      - port_data:/data
+    depends_on:
+      - control-tower
+    restart: unless-stopped
+
+  # ── Destination Hub (Johannesburg) ────────────────────────────────────────────
+  hub:
+    build: ./site_service
+    environment:
+      SITE_ID: hub
+      SITE_NAME: "Destination Hub (Johannesburg)"
+      CONTROL_TOWER_URL: http://control-tower:8000
+    ports:
+      - "8004:8000"
+    volumes:
+      - hub_data:/data
+    depends_on:
+      - control-tower
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+  depot_data:
+  border_data:
+  port_data:
+  hub_data:
