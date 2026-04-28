@@ -1,0 +1,1536 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BorderFlow — Container Tracking System</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Syne:wght@400;600;700;800&family=DM+Sans:wght@300;400;500&display=swap');
+
+:root {
+  --bg: #0a0e1a;
+  --bg2: #111827;
+  --bg3: #1a2235;
+  --border: rgba(255,255,255,0.08);
+  --border2: rgba(255,255,255,0.15);
+  --text: #e8eaf0;
+  --muted: #6b7280;
+  --accent: #3b82f6;
+  --accent2: #60a5fa;
+  --green: #10b981;
+  --amber: #f59e0b;
+  --red: #ef4444;
+  --purple: #8b5cf6;
+  --teal: #14b8a6;
+}
+
+* { margin:0; padding:0; box-sizing:border-box; }
+body { font-family:'DM Sans',sans-serif; background:var(--bg); color:var(--text); min-height:100vh; overflow-x:hidden; }
+
+/* ── LOGIN ─────────────────────────────────────────────────── */
+#login-screen {
+  min-height:100vh; display:flex; align-items:center; justify-content:center;
+  background: radial-gradient(ellipse at 30% 50%, rgba(59,130,246,0.12) 0%, transparent 60%),
+              radial-gradient(ellipse at 70% 20%, rgba(139,92,246,0.08) 0%, transparent 50%),
+              var(--bg);
+}
+.login-box {
+  width:100%; max-width:480px; padding:2.5rem;
+  background:var(--bg2); border:1px solid var(--border2);
+  border-radius:16px;
+}
+.login-logo { text-align:center; margin-bottom:2rem; }
+.login-logo h1 { font-family:'Syne',sans-serif; font-size:2rem; font-weight:800; letter-spacing:-0.02em; }
+.login-logo h1 span { color:var(--accent); }
+.login-logo p { color:var(--muted); font-size:0.85rem; margin-top:0.3rem; }
+
+.role-grid { display:grid; grid-template-columns:1fr 1fr; gap:0.75rem; margin-bottom:1.5rem; }
+.role-card {
+  padding:1rem; border:1px solid var(--border); border-radius:10px;
+  cursor:pointer; transition:all 0.2s; background:var(--bg3);
+  display:flex; flex-direction:column; gap:0.3rem;
+}
+.role-card:hover { border-color:var(--accent); background:rgba(59,130,246,0.08); }
+.role-card.selected { border-color:var(--accent); background:rgba(59,130,246,0.12); }
+.role-card .role-icon { font-size:1.4rem; }
+.role-card .role-name { font-size:0.85rem; font-weight:500; color:var(--text); }
+.role-card .role-site { font-size:0.75rem; color:var(--muted); font-family:'DM Mono',monospace; }
+
+.login-form { display:flex; flex-direction:column; gap:0.75rem; }
+.form-input {
+  padding:0.75rem 1rem; background:var(--bg3); border:1px solid var(--border);
+  border-radius:8px; color:var(--text); font-family:'DM Sans',sans-serif; font-size:0.9rem;
+  outline:none; transition:border-color 0.2s;
+}
+.form-input:focus { border-color:var(--accent); }
+.btn-login {
+  padding:0.85rem; background:var(--accent); color:white; border:none;
+  border-radius:8px; font-family:'Syne',sans-serif; font-weight:600; font-size:0.95rem;
+  cursor:pointer; transition:background 0.2s; letter-spacing:0.02em;
+}
+.btn-login:hover { background:#2563eb; }
+
+/* ── APP SHELL ─────────────────────────────────────────────── */
+#app { display:none; min-height:100vh; }
+
+.topbar {
+  height:56px; background:var(--bg2); border-bottom:1px solid var(--border);
+  display:flex; align-items:center; padding:0 1.5rem; gap:1rem; position:sticky; top:0; z-index:100;
+}
+.topbar-logo { font-family:'Syne',sans-serif; font-weight:800; font-size:1.1rem; }
+.topbar-logo span { color:var(--accent); }
+.topbar-role {
+  background:var(--bg3); border:1px solid var(--border); border-radius:6px;
+  padding:0.25rem 0.75rem; font-size:0.78rem; font-family:'DM Mono',monospace; color:var(--accent2);
+}
+.topbar-user { font-size:0.85rem; color:var(--muted); }
+.topbar-right { margin-left:auto; display:flex; align-items:center; gap:0.75rem; }
+.online-badge {
+  display:flex; align-items:center; gap:0.4rem; font-size:0.78rem;
+  background:rgba(16,185,129,0.1); border:1px solid rgba(16,185,129,0.3);
+  padding:0.2rem 0.6rem; border-radius:20px; color:var(--green);
+}
+.online-badge .dot { width:6px; height:6px; border-radius:50%; background:var(--green); animation:pulse 2s infinite; }
+@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+.btn-logout { padding:0.3rem 0.8rem; background:transparent; border:1px solid var(--border); border-radius:6px; color:var(--muted); cursor:pointer; font-size:0.8rem; }
+.btn-logout:hover { border-color:var(--red); color:var(--red); }
+
+.layout { display:flex; }
+.sidebar {
+  width:220px; min-height:calc(100vh - 56px); background:var(--bg2);
+  border-right:1px solid var(--border); padding:1rem 0; position:sticky;
+  top:56px; height:calc(100vh - 56px); overflow-y:auto; flex-shrink:0;
+}
+.nav-section { padding:0.5rem 1rem; font-size:0.7rem; text-transform:uppercase;
+  letter-spacing:0.1em; color:var(--muted); margin-top:0.5rem; }
+.nav-item {
+  display:flex; align-items:center; gap:0.6rem; padding:0.6rem 1rem;
+  cursor:pointer; font-size:0.88rem; color:var(--muted); transition:all 0.15s;
+  border-left:2px solid transparent;
+}
+.nav-item:hover { color:var(--text); background:rgba(255,255,255,0.03); }
+.nav-item.active { color:var(--accent2); border-left-color:var(--accent); background:rgba(59,130,246,0.06); }
+.nav-icon { width:16px; text-align:center; font-size:0.9rem; }
+
+.main { flex:1; padding:1.5rem; overflow-y:auto; }
+
+/* ── PANELS ────────────────────────────────────────────────── */
+.panel { display:none; }
+.panel.active { display:block; }
+
+.page-header { margin-bottom:1.5rem; }
+.page-header h2 { font-family:'Syne',sans-serif; font-size:1.4rem; font-weight:700; }
+.page-header p { color:var(--muted); font-size:0.85rem; margin-top:0.3rem; }
+
+/* ── CARDS ─────────────────────────────────────────────────── */
+.card {
+  background:var(--bg2); border:1px solid var(--border);
+  border-radius:12px; padding:1.25rem; margin-bottom:1rem;
+}
+.card-title { font-weight:500; font-size:0.9rem; color:var(--muted); margin-bottom:1rem;
+  text-transform:uppercase; letter-spacing:0.06em; font-size:0.75rem; }
+
+.kpi-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(140px,1fr)); gap:1rem; margin-bottom:1.5rem; }
+.kpi { background:var(--bg2); border:1px solid var(--border); border-radius:12px; padding:1.2rem; }
+.kpi-val { font-family:'Syne',sans-serif; font-size:2.2rem; font-weight:800; }
+.kpi-label { font-size:0.75rem; color:var(--muted); margin-top:0.2rem; text-transform:uppercase; letter-spacing:0.06em; }
+
+/* ── TABLE ─────────────────────────────────────────────────── */
+.table-wrap { overflow-x:auto; }
+table { width:100%; border-collapse:collapse; font-size:0.85rem; }
+th { padding:0.6rem 0.8rem; text-align:left; color:var(--muted); font-weight:500;
+  font-size:0.75rem; text-transform:uppercase; letter-spacing:0.05em;
+  border-bottom:1px solid var(--border); }
+td { padding:0.7rem 0.8rem; border-bottom:1px solid rgba(255,255,255,0.04); }
+tr:hover td { background:rgba(255,255,255,0.02); }
+.mono { font-family:'DM Mono',monospace; font-size:0.82rem; }
+
+/* ── BADGES ────────────────────────────────────────────────── */
+.badge { display:inline-block; padding:2px 8px; border-radius:20px; font-size:0.72rem; font-weight:500; font-family:'DM Mono',monospace; }
+.badge-green { background:rgba(16,185,129,0.15); color:#34d399; border:1px solid rgba(16,185,129,0.3); }
+.badge-blue { background:rgba(59,130,246,0.15); color:#60a5fa; border:1px solid rgba(59,130,246,0.3); }
+.badge-amber { background:rgba(245,158,11,0.15); color:#fbbf24; border:1px solid rgba(245,158,11,0.3); }
+.badge-red { background:rgba(239,68,68,0.15); color:#f87171; border:1px solid rgba(239,68,68,0.3); }
+.badge-gray { background:rgba(107,114,128,0.15); color:#9ca3af; border:1px solid rgba(107,114,128,0.3); }
+.badge-purple { background:rgba(139,92,246,0.15); color:#a78bfa; border:1px solid rgba(139,92,246,0.3); }
+
+/* ── FORMS ─────────────────────────────────────────────────── */
+.form-group { margin-bottom:1rem; }
+.form-label { display:block; font-size:0.8rem; color:var(--muted); margin-bottom:0.4rem; font-weight:500; }
+.form-control {
+  width:100%; padding:0.65rem 0.9rem; background:var(--bg3);
+  border:1px solid var(--border); border-radius:8px; color:var(--text);
+  font-family:'DM Sans',sans-serif; font-size:0.88rem; outline:none;
+}
+.form-control:focus { border-color:var(--accent); }
+select.form-control option { background:var(--bg3); }
+.form-row { display:grid; grid-template-columns:1fr 1fr; gap:1rem; }
+.btn {
+  padding:0.65rem 1.2rem; border-radius:8px; font-family:'Syne',sans-serif;
+  font-weight:600; font-size:0.85rem; cursor:pointer; border:none; transition:all 0.2s;
+}
+.btn-primary { background:var(--accent); color:white; }
+.btn-primary:hover { background:#2563eb; }
+.btn-success { background:var(--green); color:white; }
+.btn-success:hover { background:#059669; }
+.btn-warning { background:var(--amber); color:#1a1a1a; }
+.btn-danger { background:var(--red); color:white; }
+.btn-outline { background:transparent; border:1px solid var(--border2); color:var(--text); }
+.btn-outline:hover { border-color:var(--accent); color:var(--accent2); }
+.btn-sm { padding:0.35rem 0.7rem; font-size:0.78rem; }
+
+/* ── ALERTS ────────────────────────────────────────────────── */
+.alert { padding:0.75rem 1rem; border-radius:8px; font-size:0.85rem; margin-bottom:1rem; display:none; }
+.alert.show { display:block; }
+.alert-success { background:rgba(16,185,129,0.1); border:1px solid rgba(16,185,129,0.3); color:#34d399; }
+.alert-error { background:rgba(239,68,68,0.1); border:1px solid rgba(239,68,68,0.3); color:#f87171; }
+
+/* ── TIMELINE ──────────────────────────────────────────────── */
+.timeline { position:relative; padding-left:1.5rem; }
+.timeline::before { content:''; position:absolute; left:6px; top:0; bottom:0; width:1px; background:var(--border); }
+.tl-item { position:relative; margin-bottom:1rem; }
+.tl-dot { position:absolute; left:-1.5rem; top:4px; width:12px; height:12px; border-radius:50%; background:var(--accent); border:2px solid var(--bg2); }
+.tl-dot.green { background:var(--green); }
+.tl-dot.amber { background:var(--amber); }
+.tl-dot.red { background:var(--red); }
+.tl-event { font-size:0.85rem; font-weight:500; }
+.tl-meta { font-size:0.75rem; color:var(--muted); margin-top:0.2rem; font-family:'DM Mono',monospace; }
+
+/* ── OFFLINE DEMO ──────────────────────────────────────────── */
+.offline-banner {
+  background:rgba(239,68,68,0.1); border:1px solid rgba(239,68,68,0.3);
+  border-radius:8px; padding:0.75rem 1rem; margin-bottom:1rem;
+  display:none; align-items:center; gap:0.75rem; color:#f87171; font-size:0.85rem;
+}
+.offline-banner.show { display:flex; }
+
+/* ── SYNC STATUS ───────────────────────────────────────────── */
+.sync-row { display:flex; align-items:center; justify-content:space-between;
+  padding:0.6rem 0; border-bottom:1px solid var(--border); font-size:0.85rem; }
+.sync-pending { color:var(--amber); font-family:'DM Mono',monospace; font-size:0.85rem; }
+
+/* ── EMPTY STATE ───────────────────────────────────────────── */
+.empty { text-align:center; padding:3rem 1rem; color:var(--muted); }
+.empty-icon { font-size:2.5rem; margin-bottom:0.75rem; }
+.empty p { font-size:0.9rem; }
+
+/* ── MODAL ─────────────────────────────────────────────────── */
+.modal-overlay {
+  position:fixed; inset:0; background:rgba(0,0,0,0.7); z-index:200;
+  display:none; align-items:center; justify-content:center; padding:1rem;
+}
+.modal-overlay.show { display:flex; }
+.modal {
+  background:var(--bg2); border:1px solid var(--border2); border-radius:16px;
+  padding:2rem; width:100%; max-width:520px; max-height:90vh; overflow-y:auto;
+}
+.modal-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:1.5rem; }
+.modal-title { font-family:'Syne',sans-serif; font-weight:700; font-size:1.1rem; }
+.modal-close { background:none; border:none; color:var(--muted); cursor:pointer; font-size:1.2rem; }
+</style>
+</head>
+<body>
+
+<!-- ── LOGIN SCREEN ─────────────────────────────────────────── -->
+<div id="login-screen">
+  <div class="login-box">
+    <div class="login-logo">
+      <h1>Border<span>Flow</span></h1>
+      <p>Cross-Border Container Tracking System</p>
+      <p style="font-size:0.75rem;color:var(--muted);margin-top:0.5rem;font-family:'DM Mono',monospace;">National University of Lesotho · CS4430</p>
+    </div>
+
+    <!-- TABS -->
+    <div style="display:flex;gap:0;margin-bottom:1.5rem;background:var(--bg3);border-radius:8px;padding:3px;">
+      <button id="tab-btn-login" onclick="switchTab('login')" style="flex:1;padding:0.5rem;border:none;border-radius:6px;cursor:pointer;font-family:'Syne',sans-serif;font-weight:600;font-size:0.85rem;background:var(--accent);color:white;transition:all 0.2s;">Sign In</button>
+      <button id="tab-btn-register" onclick="switchTab('register')" style="flex:1;padding:0.5rem;border:none;border-radius:6px;cursor:pointer;font-family:'Syne',sans-serif;font-weight:600;font-size:0.85rem;background:transparent;color:var(--muted);transition:all 0.2s;">Register</button>
+    </div>
+
+    <!-- SIGN IN -->
+    <div id="login-tab">
+      <div class="login-form">
+        <input class="form-input" id="login-username" placeholder="Username" autocomplete="username"/>
+        <input class="form-input" id="login-password" type="password" placeholder="Password"/>
+        <button class="btn-login" onclick="doLogin()">Sign In →</button>
+      </div>
+      <p id="login-error" style="color:var(--red);font-size:0.8rem;margin-top:0.5rem;display:none;"></p>
+      <p style="color:var(--muted);font-size:0.78rem;margin-top:1rem;text-align:center">
+        Default admin: <span style="font-family:'DM Mono',monospace;color:var(--accent2)">admin / admin123</span>
+      </p>
+    </div>
+
+    <!-- REGISTER -->
+    <div id="register-tab" style="display:none;">
+      <div class="login-form">
+        <input class="form-input" id="reg-username" placeholder="Choose a username"/>
+        <input class="form-input" id="reg-fullname" placeholder="Full name (e.g. Thabo Mokoena)"/>
+        <input class="form-input" id="reg-password" type="password" placeholder="Choose a password (min 6 chars)"/>
+        <input class="form-input" id="reg-password2" type="password" placeholder="Confirm password"/>
+        <p style="font-size:0.8rem;color:var(--muted);margin:0.25rem 0 0.5rem;">Select your role:</p>
+        <div class="role-grid" id="role-grid-reg">
+          <div class="role-card" onclick="selectRegRole(this,'depot_controller','Depot Controller','depot','Origin Depot (Maseru)')">
+            <span class="role-icon">🏭</span><span class="role-name">Depot Controller</span><span class="role-site">depot · :8001</span>
+          </div>
+          <div class="role-card" onclick="selectRegRole(this,'depot_clerk','Depot Clerk','depot','Origin Depot (Maseru)')">
+            <span class="role-icon">📋</span><span class="role-name">Depot Clerk</span><span class="role-site">depot · :8001</span>
+          </div>
+          <div class="role-card" onclick="selectRegRole(this,'truck_driver','Truck Driver','depot','Origin Depot (Maseru)')">
+            <span class="role-icon">🚛</span><span class="role-name">Truck Driver</span><span class="role-site">mobile · field</span>
+          </div>
+          <div class="role-card" onclick="selectRegRole(this,'border_agent','Border Agent','border','Border Post (Maseru Bridge)')">
+            <span class="role-icon">🛂</span><span class="role-name">Border Agent</span><span class="role-site">border · :8002</span>
+          </div>
+          <div class="role-card" onclick="selectRegRole(this,'port_agent','Port Agent','port','Port Site (Durban)')">
+            <span class="role-icon">⚓</span><span class="role-name">Port Agent</span><span class="role-site">port · :8003</span>
+          </div>
+          <div class="role-card" onclick="selectRegRole(this,'management','Management','control_tower','Control Tower')">
+            <span class="role-icon">📊</span><span class="role-name">Management</span><span class="role-site">control tower · :8000</span>
+          </div>
+          <div class="role-card" onclick="selectRegRole(this,'client','Client','control_tower','Control Tower')">
+            <span class="role-icon">👤</span><span class="role-name">Client</span><span class="role-site">read-only tracking</span>
+          </div>
+        </div>
+        <button class="btn-login" onclick="doRegister()">Create Account →</button>
+      </div>
+      <p id="reg-error" style="font-size:0.8rem;margin-top:0.5rem;display:none;"></p>
+    </div>
+  </div>
+</div>
+
+<!-- ── APP ──────────────────────────────────────────────────── -->
+<div id="app">
+  <div class="topbar">
+    <div class="topbar-logo">Border<span>Flow</span></div>
+    <div class="topbar-role" id="tb-role">—</div>
+    <div class="topbar-user" id="tb-user">—</div>
+    <div class="topbar-right">
+      <div class="online-badge" id="online-badge">
+        <span class="dot"></span><span id="online-text">Online</span>
+      </div>
+      <button class="btn-logout" onclick="doLogout()">Sign out</button>
+    </div>
+  </div>
+
+  <div class="layout">
+    <div class="sidebar" id="sidebar">
+      <!-- nav items injected by JS -->
+    </div>
+    <div class="main" id="main-content">
+      <!-- panels injected by JS -->
+    </div>
+  </div>
+</div>
+
+<!-- ── MODAL ────────────────────────────────────────────────── -->
+<div class="modal-overlay" id="modal">
+  <div class="modal">
+    <div class="modal-header">
+      <span class="modal-title" id="modal-title">Action</span>
+      <button class="modal-close" onclick="closeModal()">✕</button>
+    </div>
+    <div id="modal-body"></div>
+  </div>
+</div>
+
+<script>
+// ── STATE ───────────────────────────────────────────────────
+let currentRole = null, currentUser = null, currentSite = null, currentSiteName = null;
+let isOnline = true;
+
+const SITE_URLS = {
+  depot: 'http://localhost:8001',
+  border: 'http://localhost:8002',
+  port: 'http://localhost:8003',
+  hub: 'http://localhost:8004',
+  control_tower: 'http://localhost:8000'
+};
+
+// ── USER STORE (localStorage) ───────────────────────────────
+function getUsers() {
+  try { return JSON.parse(localStorage.getItem('bf_users') || '{}'); } catch(e) { return {}; }
+}
+function saveUsers(u) { localStorage.setItem('bf_users', JSON.stringify(u)); }
+
+// Seed default admin on first load
+(function() {
+  const users = getUsers();
+  if (!users['admin']) {
+    users['admin'] = { password:'admin123', fullname:'Administrator', role:'management', site:'control_tower', siteName:'Control Tower' };
+    saveUsers(users);
+  }
+})();
+
+// ── TAB SWITCHING ───────────────────────────────────────────
+function switchTab(tab) {
+  const isLogin = tab === 'login';
+  document.getElementById('login-tab').style.display = isLogin ? 'block' : 'none';
+  document.getElementById('register-tab').style.display = isLogin ? 'none' : 'block';
+  document.getElementById('tab-btn-login').style.background = isLogin ? 'var(--accent)' : 'transparent';
+  document.getElementById('tab-btn-login').style.color = isLogin ? 'white' : 'var(--muted)';
+  document.getElementById('tab-btn-register').style.background = isLogin ? 'transparent' : 'var(--accent)';
+  document.getElementById('tab-btn-register').style.color = isLogin ? 'var(--muted)' : 'white';
+}
+
+// ── REGISTER ────────────────────────────────────────────────
+let regRole = null, regSite = null, regSiteName = null;
+
+function selectRegRole(el, role, label, site, siteName) {
+  document.querySelectorAll('#role-grid-reg .role-card').forEach(c => c.classList.remove('selected'));
+  el.classList.add('selected');
+  regRole = role; regSite = site; regSiteName = siteName;
+}
+
+function doRegister() {
+  const username = document.getElementById('reg-username').value.trim().toLowerCase();
+  const fullname = document.getElementById('reg-fullname').value.trim();
+  const password = document.getElementById('reg-password').value;
+  const password2 = document.getElementById('reg-password2').value;
+  const errEl = document.getElementById('reg-error');
+  errEl.style.display = 'none';
+
+  if (!username || !fullname || !password || !regRole) {
+    errEl.textContent = 'Please fill all fields and select a role.';
+    errEl.style.color = 'var(--red)'; errEl.style.display = 'block'; return;
+  }
+  if (password.length < 6) {
+    errEl.textContent = 'Password must be at least 6 characters.';
+    errEl.style.color = 'var(--red)'; errEl.style.display = 'block'; return;
+  }
+  if (password !== password2) {
+    errEl.textContent = 'Passwords do not match.';
+    errEl.style.color = 'var(--red)'; errEl.style.display = 'block'; return;
+  }
+  const users = getUsers();
+  if (users[username]) {
+    errEl.textContent = 'Username already exists. Choose another.';
+    errEl.style.color = 'var(--red)'; errEl.style.display = 'block'; return;
+  }
+  users[username] = { password, fullname, role: regRole, site: regSite, siteName: regSiteName };
+  saveUsers(users);
+  errEl.textContent = 'Account created! You can now sign in.';
+  errEl.style.color = 'var(--green)'; errEl.style.display = 'block';
+  // Pre-fill login
+  setTimeout(() => {
+    document.getElementById('login-username').value = username;
+    switchTab('login');
+  }, 1200);
+}
+
+// ── LOGIN ───────────────────────────────────────────────────
+function doLogin() {
+  const username = document.getElementById('login-username').value.trim().toLowerCase();
+  const password = document.getElementById('login-password').value;
+  const errEl = document.getElementById('login-error');
+  const users = getUsers();
+  if (!username || !password) {
+    errEl.textContent = 'Enter your username and password.';
+    errEl.style.display = 'block'; return;
+  }
+  const user = users[username];
+  if (!user || user.password !== password) {
+    errEl.textContent = 'Invalid username or password.';
+    errEl.style.display = 'block'; return;
+  }
+  errEl.style.display = 'none';
+  currentRole = user.role; currentUser = user.fullname;
+  currentSite = user.site; currentSiteName = user.siteName;
+  document.getElementById('login-screen').style.display = 'none';
+  document.getElementById('app').style.display = 'block';
+  document.getElementById('tb-role').textContent = currentRole.replace(/_/g,' ').toUpperCase();
+  document.getElementById('tb-user').textContent = currentUser + ' · ' + currentSiteName;
+  buildUI();
+  loadInitialData();
+}
+
+function doLogout() {
+  document.getElementById('app').style.display = 'none';
+  document.getElementById('login-screen').style.display = 'flex';
+  currentRole = null; currentUser = null;
+  document.getElementById('login-username').value = '';
+  document.getElementById('login-password').value = '';
+}
+
+// ── NAVIGATION ──────────────────────────────────────────────
+const NAV_BY_ROLE = {
+  depot_controller: [
+    {id:'dashboard', icon:'⬛', label:'Dashboard'},
+    {id:'register', icon:'📦', label:'Register Container'},
+    {id:'assign_trip', icon:'🚛', label:'Assign Trip'},
+    {id:'containers', icon:'📋', label:'All Containers'},
+    {id:'sync', icon:'🔄', label:'Sync Status'},
+  ],
+  depot_clerk: [
+    {id:'dashboard', icon:'⬛', label:'Dashboard'},
+    {id:'gate_ops', icon:'🚪', label:'Gate Operations'},
+    {id:'containers', icon:'📋', label:'Containers'},
+    {id:'incidents', icon:'⚠️', label:'Report Incident'},
+    {id:'sync', icon:'🔄', label:'Sync Status'},
+  ],
+  truck_driver: [
+    {id:'my_trips', icon:'🗺️', label:'My Trips'},
+    {id:'update_status', icon:'📍', label:'Update Status'},
+    {id:'incidents', icon:'⚠️', label:'Report Incident'},
+  ],
+  border_agent: [
+    {id:'dashboard', icon:'⬛', label:'Dashboard'},
+    {id:'clearance', icon:'✅', label:'Customs Clearance'},
+    {id:'handover', icon:'🤝', label:'Record Handover'},
+    {id:'containers', icon:'📋', label:'Containers at Border'},
+    {id:'incidents', icon:'⚠️', label:'Incidents'},
+    {id:'sync', icon:'🔄', label:'Sync Status'},
+  ],
+  port_agent: [
+    {id:'dashboard', icon:'⬛', label:'Dashboard'},
+    {id:'vessel_ops', icon:'🚢', label:'Vessel Operations'},
+    {id:'milestones', icon:'📍', label:'Port Milestones'},
+    {id:'containers', icon:'📋', label:'Containers at Port'},
+    {id:'incidents', icon:'⚠️', label:'Incidents'},
+    {id:'sync', icon:'🔄', label:'Sync Status'},
+  ],
+  management: [
+    {id:'control_tower', icon:'🗼', label:'Control Tower'},
+    {id:'kpis', icon:'📊', label:'KPIs & Analytics'},
+    {id:'all_containers', icon:'📦', label:'All Containers'},
+    {id:'sync_log', icon:'🔄', label:'Sync Log'},
+    {id:'offline_demo', icon:'⚡', label:'Offline Demo'},
+  ],
+  client: [
+    {id:'track', icon:'🔍', label:'Track Container'},
+    {id:'all_containers', icon:'📦', label:'All Shipments'},
+  ]
+};
+
+function buildUI() {
+  const nav = NAV_BY_ROLE[currentRole] || [];
+  const sidebar = document.getElementById('sidebar');
+  sidebar.innerHTML = '<div class="nav-section">Navigation</div>' +
+    nav.map(n => `<div class="nav-item" id="nav-${n.id}" onclick="showPanel('${n.id}')"><span class="nav-icon">${n.icon}</span>${n.label}</div>`).join('');
+  // Build panels
+  document.getElementById('main-content').innerHTML = nav.map(n => `<div class="panel" id="panel-${n.id}"></div>`).join('');
+  showPanel(nav[0].id);
+}
+
+function showPanel(id) {
+  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  const panel = document.getElementById('panel-' + id);
+  const navItem = document.getElementById('nav-' + id);
+  if (panel) { panel.classList.add('active'); renderPanel(id, panel); }
+  if (navItem) navItem.classList.add('active');
+}
+
+// ── API HELPERS ─────────────────────────────────────────────
+async function api(site, path, method='GET', body=null) {
+  const url = SITE_URLS[site] + path;
+  const opts = { method, headers:{'Content-Type':'application/json'} };
+  if (body) opts.body = JSON.stringify(body);
+  const r = await fetch(url, opts);
+  return r.json();
+}
+
+function statusBadge(s) {
+  const map = {REGISTERED:'badge-gray',IN_TRANSIT:'badge-blue',AT_BORDER:'badge-amber',
+    CLEARED:'badge-green',AT_PORT:'badge-blue',DELIVERED:'badge-green',EXCEPTION:'badge-red'};
+  return `<span class="badge ${map[s]||'badge-gray'}">${s}</span>`;
+}
+
+function siteName(id) {
+  return {depot:'🏭 Depot',border:'🛂 Border',port:'⚓ Port',hub:'🏠 Hub',control_tower:'🗼 Tower'}[id]||id;
+}
+
+function showAlert(id, msg, type='success') {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.className = `alert alert-${type} show`;
+  el.textContent = msg;
+  setTimeout(() => el.classList.remove('show'), 4000);
+}
+
+// ── PANEL RENDERERS ─────────────────────────────────────────
+async function renderPanel(id, el) {
+  el.innerHTML = '<div style="color:var(--muted);padding:2rem;text-align:center">Loading...</div>';
+  const handlers = {
+    dashboard: renderDashboard, register: renderRegister,
+    assign_trip: renderAssignTrip, containers: renderContainers,
+    gate_ops: renderGateOps, incidents: renderIncidents,
+    sync: renderSync, my_trips: renderMyTrips,
+    update_status: renderUpdateStatus, clearance: renderClearance,
+    handover: renderHandover, vessel_ops: renderVesselOps,
+    milestones: renderMilestones, control_tower: renderControlTower,
+    kpis: renderKPIs, all_containers: renderAllContainers,
+    sync_log: renderSyncLog, offline_demo: renderOfflineDemo,
+    track: renderTrack,
+  };
+  if (handlers[id]) await handlers[id](el);
+}
+
+// DASHBOARD
+async function renderDashboard(el) {
+  try {
+    const data = await api(currentSite, '/containers');
+    const trips = await api(currentSite, '/trips');
+    const syncSt = await api(currentSite, '/sync/status');
+    const total = data.length, inTransit = data.filter(c=>c.status==='IN_TRANSIT').length;
+    const delivered = data.filter(c=>c.status==='DELIVERED').length;
+    el.innerHTML = `
+      <div class="page-header"><h2>Dashboard</h2><p>${currentSiteName}</p></div>
+      <div class="kpi-grid">
+        <div class="kpi"><div class="kpi-val" style="color:var(--accent)">${total}</div><div class="kpi-label">Total Containers</div></div>
+        <div class="kpi"><div class="kpi-val" style="color:var(--amber)">${inTransit}</div><div class="kpi-label">In Transit</div></div>
+        <div class="kpi"><div class="kpi-val" style="color:var(--green)">${delivered}</div><div class="kpi-label">Delivered</div></div>
+        <div class="kpi"><div class="kpi-val" style="color:var(--purple)">${trips.length}</div><div class="kpi-label">Active Trips</div></div>
+        <div class="kpi"><div class="kpi-val" style="color:${syncSt.pending_sync>0?'var(--amber)':'var(--green)'}">${syncSt.pending_sync}</div><div class="kpi-label">Pending Sync</div></div>
+      </div>
+      <div class="card">
+        <div class="card-title">Recent Containers</div>
+        <div class="table-wrap"><table>
+          <thead><tr><th>Reference</th><th>Client</th><th>Status</th><th>Updated</th></tr></thead>
+          <tbody>${data.slice(0,8).map(c=>`<tr>
+            <td class="mono">${c.reference}</td><td>${c.client_name}</td>
+            <td>${statusBadge(c.status)}</td>
+            <td style="color:var(--muted);font-size:0.8rem">${(c.updated_at||'').substring(0,16).replace('T',' ')}</td>
+          </tr>`).join('')||'<tr><td colspan="4" style="color:var(--muted)">No containers yet</td></tr>'}
+          </tbody>
+        </table></div>
+      </div>`;
+  } catch(e) { el.innerHTML = `<div class="card"><p style="color:var(--red)">Cannot connect to ${currentSiteName}. Is the system running?</p></div>`; }
+}
+
+// REGISTER CONTAINER
+function renderRegister(el) {
+  el.innerHTML = `
+    <div class="page-header"><h2>Register Container</h2><p>Create a new container/consignment record</p></div>
+    <div class="card" style="max-width:560px">
+      <div id="reg-alert" class="alert"></div>
+      <div class="form-row">
+        <div class="form-group"><label class="form-label">Reference Number *</label>
+          <input class="form-control" id="reg-ref" placeholder="BF-2026-001"/></div>
+        <div class="form-group"><label class="form-label">Seal Number</label>
+          <input class="form-control" id="reg-seal" placeholder="SEAL-0001"/></div>
+      </div>
+      <div class="form-group"><label class="form-label">Client Name *</label>
+        <input class="form-control" id="reg-client" placeholder="Lesotho Milling Co."/></div>
+      <div class="form-row">
+        <div class="form-group"><label class="form-label">Origin *</label>
+          <input class="form-control" id="reg-origin" value="Maseru"/></div>
+        <div class="form-group"><label class="form-label">Destination *</label>
+          <input class="form-control" id="reg-dest" placeholder="Johannesburg"/></div>
+      </div>
+      <button class="btn btn-primary" onclick="submitRegister()">Register Container</button>
+    </div>`;
+}
+
+async function submitRegister() {
+  const body = {
+    reference: document.getElementById('reg-ref').value,
+    client_name: document.getElementById('reg-client').value,
+    origin: document.getElementById('reg-origin').value,
+    destination: document.getElementById('reg-dest').value,
+    seal_number: document.getElementById('reg-seal').value
+  };
+  if (!body.reference || !body.client_name || !body.destination) { showAlert('reg-alert','Please fill all required fields','error'); return; }
+  try {
+    const r = await api(currentSite, '/containers', 'POST', body);
+    if (r.container) showAlert('reg-alert', `Container ${r.container.reference} registered successfully!`, 'success');
+    else showAlert('reg-alert', r.detail||'Error', 'error');
+  } catch(e) { showAlert('reg-alert','Cannot connect to service','error'); }
+}
+
+// ASSIGN TRIP
+async function renderAssignTrip(el) {
+  let containers = [];
+  try {
+    const [l,g] = await Promise.allSettled([api(currentSite,'/containers'),api('control_tower','/containers')]);
+    const lv = l.status==='fulfilled'?l.value:[];
+    const gv = g.status==='fulfilled'?g.value:[];
+    const map={}; lv.forEach(c=>map[c.id]=c); gv.forEach(c=>map[c.id]=c);
+    containers = Object.values(map);
+  } catch(e){}
+  el.innerHTML = `
+    <div class="page-header"><h2>Assign Trip</h2><p>Assign a container to a registered driver and vehicle</p></div>
+    <div class="card" style="max-width:560px">
+      <div id="trip-alert" class="alert"></div>
+      <div class="form-group"><label class="form-label">Container *</label>
+        <select class="form-control" id="trip-container">
+          <option value="">Select container...</option>
+          ${containers.map(c=>`<option value="${c.id}">${c.reference} — ${c.client_name} [${c.status}]</option>`).join('')}
+        </select>
+      </div>
+      ${driverDropdown('trip-driver')}
+      <div class="form-group">${vehicleDropdown('trip-vehicle','trip-driver')}</div>
+      <div class="form-group"><label class="form-label">Destination Site *</label>
+        <select class="form-control" id="trip-to">
+          <option value="border">🛂 Border Post (Maseru Bridge)</option>
+          <option value="port">⚓ Port (Durban)</option>
+          <option value="hub">🏠 Destination Hub (Johannesburg)</option>
+        </select></div>
+      <button class="btn btn-primary" onclick="submitTrip()">Assign Trip</button>
+    </div>`;
+}
+
+async function submitTrip() {
+  const reg = getVehicleReg('trip-vehicle');
+  const driverName = getDriverName('trip-driver');
+  const body = {
+    container_id: document.getElementById('trip-container').value,
+    driver_name: driverName,
+    vehicle_reg: reg,
+    to_site: document.getElementById('trip-to').value
+  };
+  if (!body.container_id) { showAlert('trip-alert','Select a container','error'); return; }
+  if (!body.driver_name) { showAlert('trip-alert','Select or enter a driver name','error'); return; }
+  if (!body.vehicle_reg) { showAlert('trip-alert','Select or enter a vehicle registration','error'); return; }
+  saveVehicle(reg);
+  try {
+    const r = await api(currentSite, '/trips', 'POST', body);
+    if (r.trip) {
+      // Also update container status to IN_TRANSIT
+      await api(currentSite, '/containers/status', 'POST', {
+        container_id: body.container_id, new_status:'IN_TRANSIT', recorded_by: currentUser
+      });
+      showAlert('trip-alert',`Trip assigned to ${driverName}! Container marked IN_TRANSIT.`,'success');
+    } else showAlert('trip-alert', r.detail||'Error assigning trip','error');
+  } catch(e) { showAlert('trip-alert','Cannot connect to service','error'); }
+}
+
+// CONTAINERS LIST - fetch from local site + control tower, merge all
+async function renderContainers(el) {
+  el.innerHTML = `<div class="page-header"><h2>Containers</h2><p>All containers visible to ${currentSiteName}</p></div><div class="card"><div class="table-wrap"><table><thead><tr><th>Reference</th><th>Client</th><th>Status</th><th>Current Site</th><th>Destination</th><th>Actions</th></tr></thead><tbody id="cont-tbody"><tr><td colspan="6" style="color:var(--muted)">Loading...</td></tr></tbody></table></div></div>`;
+  try {
+    // Fetch from local site AND control tower, merge by id
+    const [local, global] = await Promise.allSettled([
+      api(currentSite, '/containers'),
+      api('control_tower', '/containers')
+    ]);
+    const localData = local.status === 'fulfilled' ? local.value : [];
+    const globalData = global.status === 'fulfilled' ? global.value : [];
+    // Merge: use a map by id, global overrides local for status
+    const map = {};
+    localData.forEach(c => map[c.id] = c);
+    globalData.forEach(c => map[c.id] = c); // global is more up to date
+    const data = Object.values(map).sort((a,b) => (b.updated_at||'').localeCompare(a.updated_at||''));
+    document.getElementById('cont-tbody').innerHTML = data.map(c=>`<tr>
+      <td class="mono">${c.reference}</td><td>${c.client_name}</td>
+      <td>${statusBadge(c.status)}</td>
+      <td>${siteName(c.current_site||c.site_id)}</td>
+      <td>${c.destination}</td>
+      <td><button class="btn btn-outline btn-sm" onclick="viewTimeline('${c.id}','${c.reference}')">Timeline</button></td>
+    </tr>`).join('') || '<tr><td colspan="6" style="color:var(--muted)">No containers yet</td></tr>';
+  } catch(e) { document.getElementById('cont-tbody').innerHTML = '<tr><td colspan="6" style="color:var(--red)">Connection failed</td></tr>'; }
+}
+
+// GATE OPERATIONS (Depot Clerk)
+async function renderGateOps(el) {
+  let containers = [];
+  try {
+    const [l,g] = await Promise.allSettled([api(currentSite,'/containers'),api('control_tower','/containers')]);
+    const lv=l.status==='fulfilled'?l.value:[];
+    const gv=g.status==='fulfilled'?g.value:[];
+    const _m={}; lv.forEach(c=>_m[c.id]=c); gv.forEach(c=>_m[c.id]=c);
+    containers=Object.values(_m);
+  } catch(e){}
+  el.innerHTML = `
+    <div class="page-header"><h2>Gate Operations</h2><p>Gate-in/out, seal verification, status updates</p></div>
+    <div class="card" style="max-width:560px">
+      <div id="gate-alert" class="alert"></div>
+      <div class="form-group"><label class="form-label">Container *</label>
+        <select class="form-control" id="gate-container" onchange="showContainerInfo('gate-container','gate-info')">
+          <option value="">Select container...</option>
+          ${containers.map(c=>`<option value="${c.id}" data-ref="${c.reference}" data-seal="${c.seal_number||''}" data-status="${c.status}" data-client="${c.client_name}">${c.reference} — ${c.client_name} [${c.status}]</option>`).join('')}
+        </select>
+        <div id="gate-info" style="margin-top:0.5rem;padding:0.6rem;background:var(--bg3);border-radius:6px;font-size:0.82rem;display:none;">
+          <span style="color:var(--muted)">Seal: </span><span id="gate-seal" style="font-family:'DM Mono',monospace;color:var(--accent2)"></span>
+          &nbsp;·&nbsp;<span style="color:var(--muted)">Client: </span><span id="gate-client"></span>
+        </div>
+      </div>
+      <div class="form-group"><label class="form-label">Operation / New Status *</label>
+        <select class="form-control" id="gate-status">
+          <option value="IN_TRANSIT">🚛 Gate-Out — Dispatched (IN_TRANSIT)</option>
+          <option value="REGISTERED">📥 Gate-In — Received (REGISTERED)</option>
+          <option value="AT_BORDER">🛂 Arrived at Border</option>
+          <option value="CLEARED">✅ Cleared</option>
+          <option value="AT_PORT">⚓ Arrived at Port</option>
+          <option value="DELIVERED">✅ Delivered</option>
+          <option value="EXCEPTION">⚠️ Exception / Hold</option>
+        </select></div>
+      <div class="form-group"><label class="form-label">Seal Check Notes</label>
+        <input class="form-control" id="gate-notes" placeholder="Seal intact, no damage observed..."/></div>
+      <button class="btn btn-primary" onclick="submitGateOp()">Update Status</button>
+    </div>`;
+}
+
+function showContainerInfo(selectId, infoId) {
+  const sel = document.getElementById(selectId);
+  const opt = sel.options[sel.selectedIndex];
+  const info = document.getElementById(infoId);
+  if (!opt || !opt.value) { info.style.display='none'; return; }
+  document.getElementById('gate-seal').textContent = opt.getAttribute('data-seal') || 'N/A';
+  document.getElementById('gate-client').textContent = opt.getAttribute('data-client') || '';
+  info.style.display = 'block';
+}
+
+async function submitGateOp() {
+  const cid = document.getElementById('gate-container').value;
+  const status = document.getElementById('gate-status').value;
+  const notes = document.getElementById('gate-notes').value;
+  if (!cid) { showAlert('gate-alert','Select a container','error'); return; }
+  try {
+    await api(currentSite, '/containers/status', 'POST', { container_id:cid, new_status:status, recorded_by:currentUser });
+    if (notes) await api(currentSite, '/milestones', 'POST', { container_id:cid, event_type:'GATE_CHECK', description:notes, recorded_by:currentUser });
+    showAlert('gate-alert','Status updated and queued for sync!','success');
+  } catch(e) { showAlert('gate-alert','Connection failed','error'); }
+}
+
+// INCIDENTS
+async function renderIncidents(el) {
+  let containers = [];
+  try {
+    const [l,g] = await Promise.allSettled([api(currentSite,'/containers'),api('control_tower','/containers')]);
+    const lv=l.status==='fulfilled'?l.value:[];
+    const gv=g.status==='fulfilled'?g.value:[];
+    const _m={}; lv.forEach(c=>_m[c.id]=c); gv.forEach(c=>_m[c.id]=c);
+    containers=Object.values(_m);
+  } catch(e){}
+  el.innerHTML = `
+    <div class="page-header"><h2>Report Incident</h2><p>Log delays, exceptions, damage, security issues — linked to container</p></div>
+    <div class="card" style="max-width:560px">
+      <div id="inc-alert" class="alert"></div>
+      <div class="form-group"><label class="form-label">Container *</label>
+        <select class="form-control" id="inc-container" onchange="showContainerInfoGeneric('inc-container','inc-cinfo','inc-cdetail')">
+          <option value="">Select container...</option>
+          ${containers.map(c=>`<option value="${c.id}" data-ref="${c.reference}" data-dest="${c.destination}" data-status="${c.status}">${c.reference} — ${c.client_name} → ${c.destination}</option>`).join('')}
+        </select>
+        <div id="inc-cinfo" style="margin-top:0.4rem;display:none;font-size:0.8rem;color:var(--muted)">
+          Status: <span id="inc-cdetail" style="color:var(--accent2);font-family:'DM Mono',monospace"></span>
+        </div>
+      </div>
+      <div class="form-group"><label class="form-label">Incident Type *</label>
+        <select class="form-control" id="inc-type">
+          <option value="BREAKDOWN">🔧 Vehicle Breakdown</option>
+          <option value="DOCUMENT_PROBLEM">📄 Document Problem</option>
+          <option value="DAMAGE">📦 Cargo Damage</option>
+          <option value="SECURITY">🔒 Security Issue</option>
+          <option value="DELAY">⏱ Delay</option>
+          <option value="CUSTOMS_HOLD">🛂 Customs Hold</option>
+          <option value="OTHER">Other</option>
+        </select></div>
+      <div class="form-group"><label class="form-label">Description *</label>
+        <textarea class="form-control" id="inc-desc" rows="3" placeholder="Describe what happened in detail..."></textarea></div>
+      <button class="btn btn-danger" onclick="submitIncident()">⚠ Report Incident</button>
+    </div>`;
+}
+
+function showContainerInfoGeneric(selectId, infoId, detailId) {
+  const sel = document.getElementById(selectId);
+  const opt = sel.options[sel.selectedIndex];
+  const info = document.getElementById(infoId);
+  if (!opt || !opt.value) { if(info) info.style.display='none'; return; }
+  const detail = document.getElementById(detailId);
+  if (detail) detail.textContent = opt.getAttribute('data-status') || '';
+  if (info) info.style.display = 'block';
+}
+
+async function submitIncident() {
+  const body = { container_id: document.getElementById('inc-container').value,
+    incident_type: document.getElementById('inc-type').value,
+    description: document.getElementById('inc-desc').value };
+  if (!body.container_id || !body.description) { showAlert('inc-alert','Fill all fields','error'); return; }
+  try {
+    const r = await api(currentSite, '/incidents', 'POST', body);
+    showAlert('inc-alert','Incident reported and queued for sync','success');
+  } catch(e) { showAlert('inc-alert','Connection failed','error'); }
+}
+
+// SYNC STATUS
+async function renderSync(el) {
+  el.innerHTML = `<div class="page-header"><h2>Sync Status</h2><p>Synchronization queue for ${currentSiteName}</p></div><div class="card" id="sync-card"><p style="color:var(--muted)">Loading...</p></div>`;
+  try {
+    const s = await api(currentSite, '/sync/status');
+    document.getElementById('sync-card').innerHTML = `
+      <div class="sync-row"><span>Site ID</span><span class="mono" style="color:var(--accent2)">${s.site_id}</span></div>
+      <div class="sync-row"><span>Total queued operations</span><span class="mono">${s.total_queued}</span></div>
+      <div class="sync-row"><span>Pending sync</span><span class="sync-pending">${s.pending_sync} operations</span></div>
+      <div class="sync-row"><span>Status</span>${s.pending_sync===0?'<span class="badge badge-green">Fully synced</span>':'<span class="badge badge-amber">Sync pending</span>'}</div>
+      <div style="margin-top:1rem">
+        <p style="font-size:0.8rem;color:var(--muted);margin-bottom:0.5rem">Each operation has a unique <span style="font-family:\'DM Mono\',monospace;color:var(--accent2)">operation_id</span> — duplicate operations are automatically ignored (idempotency).</p>
+        <button class="btn btn-outline btn-sm" onclick="renderSync(document.getElementById('panel-sync'))">↻ Refresh</button>
+      </div>`;
+  } catch(e) { document.getElementById('sync-card').innerHTML = '<p style="color:var(--red)">Cannot connect</p>'; }
+}
+
+// MY TRIPS (Driver) - only show trips for the logged in driver
+async function renderMyTrips(el) {
+  el.innerHTML = `<div class="page-header"><h2>My Trips</h2><p>Trips assigned to you — ${currentUser}</p></div><div class="card"><div class="table-wrap"><table><thead><tr><th>Container Ref</th><th>From</th><th>To</th><th>Status</th><th>Vehicle</th></tr></thead><tbody id="trips-tbody"><tr><td colspan="5" style="color:var(--muted)">Loading...</td></tr></tbody></table></div></div>`;
+  try {
+    const [trips, containers] = await Promise.all([
+      api(currentSite, '/trips'),
+      api(currentSite, '/containers')
+    ]);
+    // Only show trips where driver_name matches current user (case insensitive partial match)
+    const myTrips = trips.filter(t => t.driver_name && t.driver_name.toLowerCase().includes(currentUser.toLowerCase().split(' ')[0]));
+    if (myTrips.length === 0) {
+      document.getElementById('trips-tbody').innerHTML = '<tr><td colspan="5" style="color:var(--muted);text-align:center;padding:2rem">No trips assigned to you yet</td></tr>';
+      return;
+    }
+    // Enrich with container reference
+    const contMap = {};
+    containers.forEach(c => contMap[c.id] = c);
+    document.getElementById('trips-tbody').innerHTML = myTrips.map(t=> {
+      const c = contMap[t.container_id];
+      return `<tr>
+        <td class="mono">${c ? c.reference : t.container_id.substring(0,8)+'...'}</td>
+        <td>${siteName(t.from_site)}</td><td>${siteName(t.to_site)}</td>
+        <td>${statusBadge(t.status)}</td><td class="mono">${t.vehicle_reg}</td>
+      </tr>`;
+    }).join('');
+  } catch(e) { document.getElementById('trips-tbody').innerHTML = '<tr><td colspan="5" style="color:var(--red)">Connection failed</td></tr>'; }
+}
+
+// UPDATE STATUS (Driver)
+async function renderUpdateStatus(el) {
+  let containers = [], trips = [];
+  try { containers = await api(currentSite, '/containers'); } catch(e){}
+  try { trips = await api(currentSite, '/trips'); } catch(e){}
+  // Find trips assigned to this driver
+  const myTrips = trips.filter(t => t.driver_name && t.driver_name.toLowerCase().includes(currentUser.toLowerCase()));
+  const myContainerIds = myTrips.map(t => t.container_id);
+  const myContainers = containers.filter(c => myContainerIds.includes(c.id));
+  const allContainers = myContainers.length > 0 ? myContainers : containers;
+  el.innerHTML = `
+    <div class="page-header"><h2>Update Status</h2><p>Confirm your delivery milestones</p></div>
+    ${myContainers.length > 0 ? '' : '<div style="background:rgba(245,158,11,0.1);border:1px solid rgba(245,158,11,0.3);border-radius:8px;padding:0.75rem;margin-bottom:1rem;font-size:0.82rem;color:#fbbf24">Showing all containers — no trips found assigned specifically to you</div>'}
+    <div class="card" style="max-width:500px">
+      <div id="us-alert" class="alert"></div>
+      <div class="form-group"><label class="form-label">Container *</label>
+        <select class="form-control" id="us-container" onchange="showContainerInfoGeneric('us-container','us-cinfo','us-cdetail')">
+          <option value="">Select container...</option>
+          ${allContainers.map(c=>`<option value="${c.id}" data-status="${c.status}">${c.reference} — ${c.client_name} → ${c.destination}</option>`).join('')}
+        </select>
+        <div id="us-cinfo" style="margin-top:0.4rem;display:none;font-size:0.8rem;color:var(--muted)">
+          Current status: <span id="us-cdetail" style="color:var(--accent2);font-family:'DM Mono',monospace"></span>
+        </div>
+      </div>
+      <div class="form-group"><label class="form-label">Confirmation *</label>
+        <select class="form-control" id="us-status">
+          <option value="IN_TRANSIT">🚛 Departed — Now In Transit</option>
+          <option value="AT_BORDER">🛂 Arrived at Border Post</option>
+          <option value="AT_PORT">⚓ Arrived at Port</option>
+          <option value="DELIVERED">✅ Successfully Delivered</option>
+        </select></div>
+      <div class="form-group"><label class="form-label">Notes</label>
+        <input class="form-control" id="us-notes" placeholder="Any notes (optional)..."/></div>
+      <button class="btn btn-success" onclick="submitDriverStatus()">✓ Confirm Status</button>
+    </div>`;
+}
+
+async function submitDriverStatus() {
+  const cid = document.getElementById('us-container').value;
+  const status = document.getElementById('us-status').value;
+  const notes = document.getElementById('us-notes').value;
+  if (!cid) { showAlert('us-alert','Select a container','error'); return; }
+  try {
+    await api(currentSite, '/containers/status', 'POST', { container_id:cid, new_status:status, recorded_by:currentUser });
+    if (notes) await api(currentSite, '/milestones', 'POST', { container_id:cid, event_type:'DRIVER_CONFIRMATION', description:notes, recorded_by:currentUser });
+    showAlert('us-alert','Status confirmed! Data queued for sync.','success');
+  } catch(e) { showAlert('us-alert','Connection failed','error'); }
+}
+
+// CLEARANCE (Border Agent)
+async function renderClearance(el) {
+  let containers = [];
+  try {
+    const [l,g] = await Promise.allSettled([api(currentSite,'/containers'),api('control_tower','/containers')]);
+    const lv=l.status==='fulfilled'?l.value:[];
+    const gv=g.status==='fulfilled'?g.value:[];
+    const _m={}; lv.forEach(c=>_m[c.id]=c); gv.forEach(c=>_m[c.id]=c);
+    containers=Object.values(_m);
+  } catch(e){}
+  el.innerHTML = `
+    <div class="page-header"><h2>Customs Clearance</h2><p>Record clearance milestones and update container status</p></div>
+    <div class="card" style="max-width:560px">
+      <div id="cl-alert" class="alert"></div>
+      <div class="form-group"><label class="form-label">Container *</label>
+        <select class="form-control" id="cl-container" onchange="showContainerInfoGeneric('cl-container','cl-cinfo','cl-cdetail')">
+          <option value="">Select container...</option>
+          ${containers.map(c=>`<option value="${c.id}" data-status="${c.status}">${c.reference} — ${c.client_name} | Origin: ${c.origin} [${c.status}]</option>`).join('')}
+        </select>
+        <div id="cl-cinfo" style="margin-top:0.4rem;display:none;font-size:0.8rem;color:var(--muted)">
+          Current status: <span id="cl-cdetail" style="color:var(--accent2);font-family:'DM Mono',monospace"></span>
+        </div>
+      </div>
+      <div class="form-group"><label class="form-label">Clearance Event</label>
+        <select class="form-control" id="cl-event">
+          <option value="ARRIVED_BORDER">Arrived at Border</option>
+          <option value="QUEUED_CUSTOMS">Queued for Customs</option>
+          <option value="DOCUMENTS_CHECKED">Documents Checked</option>
+          <option value="CUSTOMS_CLEARED">Customs Cleared ✓</option>
+          <option value="GATE_RELEASED">Gate Released</option>
+        </select></div>
+      <div class="form-group"><label class="form-label">Notes</label>
+        <input class="form-control" id="cl-notes" placeholder="Additional notes..."/></div>
+      <div style="display:flex;gap:0.75rem">
+        <button class="btn btn-primary" onclick="submitClearance()">Record Milestone</button>
+        <button class="btn btn-success" onclick="submitClearanceAndStatus()">Cleared → Update Status</button>
+      </div>
+    </div>`;
+}
+
+async function submitClearance() {
+  const cid = document.getElementById('cl-container').value;
+  const event = document.getElementById('cl-event').value;
+  const notes = document.getElementById('cl-notes').value;
+  if (!cid) { showAlert('cl-alert','Select a container','error'); return; }
+  try {
+    await api(currentSite, '/milestones', 'POST', { container_id:cid, event_type:event, description:notes||event, recorded_by:currentUser });
+    showAlert('cl-alert','Milestone recorded and queued for sync','success');
+  } catch(e) { showAlert('cl-alert','Connection failed','error'); }
+}
+
+async function submitClearanceAndStatus() {
+  const cid = document.getElementById('cl-container').value;
+  if (!cid) { showAlert('cl-alert','Select a container','error'); return; }
+  try {
+    await api(currentSite, '/milestones', 'POST', { container_id:cid, event_type:'CUSTOMS_CLEARED', description:'Customs clearance completed', recorded_by:currentUser });
+    await api(currentSite, '/containers/status', 'POST', { container_id:cid, new_status:'CLEARED', recorded_by:currentUser });
+    showAlert('cl-alert','Container cleared and status updated!','success');
+  } catch(e) { showAlert('cl-alert','Connection failed','error'); }
+}
+
+// HANDOVER (Border Agent)
+async function renderHandover(el) {
+  let containers = [];
+  try {
+    const [l,g] = await Promise.allSettled([api(currentSite,'/containers'),api('control_tower','/containers')]);
+    const lv=l.status==='fulfilled'?l.value:[];
+    const gv=g.status==='fulfilled'?g.value:[];
+    const _m={}; lv.forEach(c=>_m[c.id]=c); gv.forEach(c=>_m[c.id]=c);
+    containers=Object.values(_m);
+  } catch(e){}
+  el.innerHTML = `
+    <div class="page-header"><h2>Record Handover</h2><p>Document container handover between sites with full accountability</p></div>
+    <div class="card" style="max-width:560px">
+      <div id="ho-alert" class="alert"></div>
+      <div class="form-group"><label class="form-label">Container *</label>
+        <select class="form-control" id="ho-container">
+          <option value="">Select container...</option>
+          ${containers.map(c=>`<option value="${c.id}">${c.reference} — ${c.client_name} [${c.status}]</option>`).join('')}
+        </select></div>
+      ${driverDropdown('ho-driver')}
+      <div class="form-group">${vehicleDropdown('ho-vehicle','ho-driver')}</div>
+      <div class="form-group"><label class="form-label">Handover To *</label>
+        <select class="form-control" id="ho-to">
+          <option value="port">⚓ Port (Durban)</option>
+          <option value="hub">🏠 Destination Hub (Johannesburg)</option>
+        </select></div>
+      <button class="btn btn-primary" onclick="submitHandover()">Record Handover</button>
+    </div>`;
+}
+
+async function submitHandover() {
+  const cid = document.getElementById('ho-container').value;
+  const driver = getDriverName('ho-driver');
+  const vehicle = getVehicleReg('ho-vehicle');
+  const to = document.getElementById('ho-to').value;
+  if (!cid || !driver || !vehicle) { showAlert('ho-alert','Fill all required fields','error'); return; }
+  saveVehicle(vehicle);
+  try {
+    await api(currentSite, '/milestones', 'POST', { container_id:cid, event_type:'HANDOVER_COMPLETED', description:`Handed over to ${driver} (${vehicle}) heading to ${to}`, recorded_by:currentUser });
+    await api(currentSite, '/trips', 'POST', { container_id:cid, driver_name:driver, vehicle_reg:vehicle, to_site:to });
+    showAlert('ho-alert','Handover recorded and synced to Control Tower!','success');
+  } catch(e) { showAlert('ho-alert','Connection failed or duplicate trip','error'); }
+}
+
+// VESSEL OPS (Port Agent)
+async function renderVesselOps(el) {
+  el.innerHTML = `
+    <div class="page-header"><h2>Vessel Operations</h2><p>Register containers arriving at port</p></div>
+    <div class="card" style="max-width:560px">
+      <div id="vo-alert" class="alert"></div>
+      <div class="form-row">
+        <div class="form-group"><label class="form-label">Reference</label>
+          <input class="form-control" id="vo-ref" placeholder="BF-PORT-001"/></div>
+        <div class="form-group"><label class="form-label">Vessel Name</label>
+          <input class="form-control" id="vo-vessel" placeholder="MV Cape Pioneer"/></div>
+      </div>
+      <div class="form-group"><label class="form-label">Client Name</label>
+        <input class="form-control" id="vo-client" placeholder="Client company"/></div>
+      <div class="form-row">
+        <div class="form-group"><label class="form-label">Origin</label>
+          <input class="form-control" id="vo-origin" value="Durban Port"/></div>
+        <div class="form-group"><label class="form-label">Destination</label>
+          <input class="form-control" id="vo-dest" placeholder="Cape Town"/></div>
+      </div>
+      <button class="btn btn-primary" onclick="submitVesselReg()">Register at Port</button>
+    </div>`;
+}
+
+async function submitVesselReg() {
+  const vessel = document.getElementById('vo-vessel').value;
+  const body = { reference: document.getElementById('vo-ref').value,
+    client_name: document.getElementById('vo-client').value,
+    origin: document.getElementById('vo-origin').value,
+    destination: document.getElementById('vo-dest').value,
+    seal_number: vessel ? `VESSEL-${vessel.replace(/\s/g,'-')}` : null };
+  if (!body.reference || !body.client_name) { showAlert('vo-alert','Fill required fields','error'); return; }
+  try {
+    const r = await api(currentSite, '/containers', 'POST', body);
+    if (r.container) {
+      await api(currentSite, '/milestones', 'POST', { container_id:r.container.id, event_type:'VESSEL_ARRIVED', description:`${vessel||'Vessel'} arrived at port`, recorded_by:currentUser });
+      showAlert('vo-alert','Container registered at port!','success');
+    } else showAlert('vo-alert', r.detail||'Error','error');
+  } catch(e) { showAlert('vo-alert','Connection failed','error'); }
+}
+
+// MILESTONES (Port Agent)
+async function renderMilestones(el) {
+  let containers = [];
+  try {
+    const [l,g] = await Promise.allSettled([api(currentSite,'/containers'),api('control_tower','/containers')]);
+    const lv=l.status==='fulfilled'?l.value:[];
+    const gv=g.status==='fulfilled'?g.value:[];
+    const _m={}; lv.forEach(c=>_m[c.id]=c); gv.forEach(c=>_m[c.id]=c);
+    containers=Object.values(_m);
+  } catch(e){}
+  el.innerHTML = `
+    <div class="page-header"><h2>Port Milestones</h2><p>Record vessel loading, discharge, gate events</p></div>
+    <div class="card" style="max-width:560px">
+      <div id="ms-alert" class="alert"></div>
+      <div class="form-group"><label class="form-label">Container *</label>
+        <select class="form-control" id="ms-container" onchange="showContainerInfoGeneric('ms-container','ms-cinfo','ms-cdetail')">
+          <option value="">Select container...</option>
+          ${containers.map(c=>`<option value="${c.id}" data-status="${c.status}">${c.reference} — ${c.client_name} [${c.status}]</option>`).join('')}
+        </select>
+        <div id="ms-cinfo" style="margin-top:0.4rem;display:none;font-size:0.8rem;color:var(--muted)">
+          Status: <span id="ms-cdetail" style="color:var(--accent2);font-family:'DM Mono',monospace"></span>
+        </div>
+      </div>
+      <div class="form-group"><label class="form-label">Milestone</label>
+        <select class="form-control" id="ms-event">
+          <option value="VESSEL_ARRIVED">Vessel Arrived</option>
+          <option value="LOADING_STARTED">Loading Started</option>
+          <option value="LOADING_COMPLETE">Loading Complete</option>
+          <option value="VESSEL_DEPARTED">Vessel Departed</option>
+          <option value="DISCHARGE_STARTED">Discharge Started</option>
+          <option value="DISCHARGE_COMPLETE">Discharge Complete</option>
+          <option value="GATE_IN">Gate In</option>
+          <option value="GATE_OUT">Gate Out</option>
+        </select></div>
+      <div class="form-group"><label class="form-label">Notes</label>
+        <input class="form-control" id="ms-notes" placeholder="Berth number, vessel name..."/></div>
+      <button class="btn btn-primary" onclick="submitMilestone()">Record Milestone</button>
+    </div>`;
+}
+
+async function submitMilestone() {
+  const body = { container_id: document.getElementById('ms-container').value,
+    event_type: document.getElementById('ms-event').value,
+    description: document.getElementById('ms-notes').value,
+    recorded_by: currentUser };
+  if (!body.container_id) { showAlert('ms-alert','Select a container','error'); return; }
+  try {
+    await api(currentSite, '/milestones', 'POST', body);
+    showAlert('ms-alert','Milestone recorded!','success');
+  } catch(e) { showAlert('ms-alert','Connection failed','error'); }
+}
+
+// CONTROL TOWER
+async function renderControlTower(el) {
+  el.innerHTML = `<div class="page-header"><h2>Control Tower</h2><p>Global view of all containers across all sites</p></div>
+  <div style="background:var(--bg3);border:1px solid var(--border);border-radius:10px;padding:1rem;margin-bottom:1.5rem">
+    <div style="font-size:0.75rem;color:var(--accent2);font-family:'DM Mono',monospace;margin-bottom:0.75rem;text-transform:uppercase;letter-spacing:0.08em">📋 Demo Order — Complete Trip Workflow</div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:0.5rem;font-size:0.8rem">
+      <div style="background:rgba(59,130,246,0.08);border-radius:6px;padding:0.6rem;text-align:center">
+        <div style="font-size:1.1rem">1️⃣</div><div style="font-weight:600;color:var(--text)">Depot Controller</div>
+        <div style="color:var(--muted);margin-top:0.2rem">Register Container + Assign Trip to Driver</div>
+      </div>
+      <div style="background:rgba(59,130,246,0.08);border-radius:6px;padding:0.6rem;text-align:center">
+        <div style="font-size:1.1rem">2️⃣</div><div style="font-weight:600;color:var(--text)">Truck Driver</div>
+        <div style="color:var(--muted);margin-top:0.2rem">See My Trips → Confirm In Transit</div>
+      </div>
+      <div style="background:rgba(59,130,246,0.08);border-radius:6px;padding:0.6rem;text-align:center">
+        <div style="font-size:1.1rem">3️⃣</div><div style="font-weight:600;color:var(--text)">Border Agent</div>
+        <div style="color:var(--muted);margin-top:0.2rem">Customs Clearance + Record Handover</div>
+      </div>
+      <div style="background:rgba(59,130,246,0.08);border-radius:6px;padding:0.6rem;text-align:center">
+        <div style="font-size:1.1rem">4️⃣</div><div style="font-weight:600;color:var(--text)">Port Agent</div>
+        <div style="color:var(--muted);margin-top:0.2rem">Vessel Operations + Port Milestones</div>
+      </div>
+      <div style="background:rgba(59,130,246,0.08);border-radius:6px;padding:0.6rem;text-align:center">
+        <div style="font-size:1.1rem">5️⃣</div><div style="font-weight:600;color:var(--text)">Depot Clerk</div>
+        <div style="color:var(--muted);margin-top:0.2rem">Gate-Out confirmation + Seal check</div>
+      </div>
+      <div style="background:rgba(16,185,129,0.08);border:1px solid rgba(16,185,129,0.2);border-radius:6px;padding:0.6rem;text-align:center">
+        <div style="font-size:1.1rem">✅</div><div style="font-weight:600;color:var(--green)">Management</div>
+        <div style="color:var(--muted);margin-top:0.2rem">Watch it all sync here in real-time</div>
+      </div>
+    </div>
+  </div><div class="kpi-grid" id="ct-kpis"></div><div class="card"><div class="card-title">All containers — global view</div><div class="table-wrap"><table><thead><tr><th>Reference</th><th>Client</th><th>Status</th><th>Current Site</th><th>Updated</th><th>Actions</th></tr></thead><tbody id="ct-tbody"><tr><td colspan="6" style="color:var(--muted)">Loading...</td></tr></tbody></table></div></div>`;
+  try {
+    const [kpis, containers] = await Promise.all([api('control_tower','/kpis'), api('control_tower','/containers')]);
+    document.getElementById('ct-kpis').innerHTML = `
+      <div class="kpi"><div class="kpi-val" style="color:var(--accent)">${kpis.total_containers}</div><div class="kpi-label">Total</div></div>
+      <div class="kpi"><div class="kpi-val" style="color:var(--amber)">${kpis.in_transit}</div><div class="kpi-label">In Transit</div></div>
+      <div class="kpi"><div class="kpi-val" style="color:var(--green)">${kpis.delivered}</div><div class="kpi-label">Delivered</div></div>
+      <div class="kpi"><div class="kpi-val" style="color:var(--red)">${kpis.total_incidents}</div><div class="kpi-label">Incidents</div></div>
+      <div class="kpi"><div class="kpi-val" style="color:var(--purple)">${kpis.total_syncs}</div><div class="kpi-label">Sync Events</div></div>`;
+    document.getElementById('ct-tbody').innerHTML = containers.map(c=>`<tr>
+      <td class="mono">${c.reference}</td><td>${c.client_name}</td>
+      <td>${statusBadge(c.status)}</td><td>${siteName(c.current_site)}</td>
+      <td style="color:var(--muted);font-size:0.8rem">${(c.updated_at||'').substring(0,16).replace('T',' ')}</td>
+      <td><button class="btn btn-outline btn-sm" onclick="viewTimeline('${c.id}','${c.reference}')">Timeline</button></td>
+    </tr>`).join('') || '<tr><td colspan="6" style="color:var(--muted)">No containers</td></tr>';
+  } catch(e) { el.innerHTML = '<div class="card"><p style="color:var(--red)">Cannot connect to Control Tower</p></div>'; }
+}
+
+// KPIs
+async function renderKPIs(el) {
+  el.innerHTML = `<div class="page-header"><h2>KPIs & Analytics</h2><p>Performance metrics across all sites</p></div><div id="kpi-content"><p style="color:var(--muted)">Loading...</p></div>`;
+  try {
+    const kpis = await api('control_tower', '/kpis');
+    document.getElementById('kpi-content').innerHTML = `
+      <div class="kpi-grid">
+        <div class="kpi"><div class="kpi-val" style="color:var(--accent)">${kpis.total_containers}</div><div class="kpi-label">Total Containers</div></div>
+        <div class="kpi"><div class="kpi-val" style="color:var(--amber)">${kpis.in_transit}</div><div class="kpi-label">In Transit</div></div>
+        <div class="kpi"><div class="kpi-val" style="color:var(--green)">${kpis.delivered}</div><div class="kpi-label">Delivered</div></div>
+        <div class="kpi"><div class="kpi-val" style="color:var(--red)">${kpis.total_incidents}</div><div class="kpi-label">Incidents</div></div>
+        <div class="kpi"><div class="kpi-val" style="color:var(--purple)">${kpis.total_syncs}</div><div class="kpi-label">Total Syncs</div></div>
+      </div>
+      <div class="card">
+        <div class="card-title">Containers by site</div>
+        ${kpis.containers_by_site.map(s=>`
+          <div class="sync-row">
+            <span>${siteName(s.current_site)}</span>
+            <span class="badge badge-blue">${s.count} containers</span>
+          </div>`).join('') || '<p style="color:var(--muted)">No data</p>'}
+      </div>`;
+  } catch(e) { document.getElementById('kpi-content').innerHTML = '<p style="color:var(--red)">Cannot connect</p>'; }
+}
+
+// ALL CONTAINERS (Management/Client)
+async function renderAllContainers(el) {
+  el.innerHTML = `<div class="page-header"><h2>All Containers</h2><p>Global container registry</p></div><div class="card"><div class="table-wrap"><table><thead><tr><th>Reference</th><th>Client</th><th>Status</th><th>Site</th><th>Origin → Dest</th><th>Actions</th></tr></thead><tbody id="all-tbody"><tr><td colspan="6" style="color:var(--muted)">Loading...</td></tr></tbody></table></div></div>`;
+  try {
+    const data = await api('control_tower', '/containers');
+    document.getElementById('all-tbody').innerHTML = data.map(c=>`<tr>
+      <td class="mono">${c.reference}</td><td>${c.client_name}</td>
+      <td>${statusBadge(c.status)}</td><td>${siteName(c.current_site)}</td>
+      <td style="font-size:0.82rem">${c.origin} → ${c.destination}</td>
+      <td><button class="btn btn-outline btn-sm" onclick="viewTimeline('${c.id}','${c.reference}')">Track</button></td>
+    </tr>`).join('') || '<tr><td colspan="6" style="color:var(--muted)">No containers</td></tr>';
+  } catch(e) { document.getElementById('all-tbody').innerHTML = '<tr><td colspan="6" style="color:var(--red)">Cannot connect to Control Tower</td></tr>'; }
+}
+
+// SYNC LOG
+async function renderSyncLog(el) {
+  el.innerHTML = `<div class="page-header"><h2>Sync Log</h2><p>Replication events, idempotency checks, conflict resolution</p></div><div class="card"><div class="table-wrap"><table><thead><tr><th>Site</th><th>Operations</th><th>Conflicts Resolved</th><th>Time</th></tr></thead><tbody id="sl-tbody"><tr><td colspan="4" style="color:var(--muted)">Loading...</td></tr></tbody></table></div></div>`;
+  try {
+    const data = await api('control_tower', '/sync/log');
+    document.getElementById('sl-tbody').innerHTML = data.map(s=>`<tr>
+      <td>${siteName(s.site_id)}</td>
+      <td><span class="badge badge-blue">${s.operations_count}</span></td>
+      <td>${s.conflicts_detected>0?`<span class="badge badge-amber">${s.conflicts_detected} resolved</span>`:'<span class="badge badge-green">None</span>'}</td>
+      <td style="color:var(--muted);font-size:0.8rem;font-family:\'DM Mono\',monospace">${(s.received_at||'').substring(0,16).replace('T',' ')}</td>
+    </tr>`).join('') || '<tr><td colspan="4" style="color:var(--muted)">No sync events yet</td></tr>';
+  } catch(e) { document.getElementById('sl-tbody').innerHTML = '<tr><td colspan="4" style="color:var(--red)">Cannot connect</td></tr>'; }
+}
+
+// OFFLINE DEMO
+function renderOfflineDemo(el) {
+  el.innerHTML = `
+    <div class="page-header"><h2>Offline Demo</h2><p>Demonstrate failure and recovery — required by handout section 4.2</p></div>
+    <div id="offline-banner" class="offline-banner">
+      <span>⚠</span><span id="offline-site-name">Border Post</span> is currently <strong>OFFLINE</strong> — operations queued locally
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem">
+      <div class="card">
+        <div class="card-title">Step 1 — Take a site offline</div>
+        <p style="font-size:0.85rem;color:var(--muted);margin-bottom:1rem">This simulates a network partition. The site continues accepting writes but cannot sync to Control Tower.</p>
+        <div class="form-group"><label class="form-label">Site to partition</label>
+          <select class="form-control" id="demo-site">
+            <option value="border">Border Post</option>
+            <option value="depot">Depot</option>
+            <option value="port">Port</option>
+            <option value="hub">Hub</option>
+          </select></div>
+        <div style="display:flex;gap:0.5rem">
+          <button class="btn btn-danger" onclick="goOffline()">Go Offline</button>
+          <button class="btn btn-success" onclick="goOnline()">Restore Connection</button>
+        </div>
+        <div id="demo-alert" class="alert" style="margin-top:0.75rem"></div>
+      </div>
+      <div class="card">
+        <div class="card-title">Step 2 — Register while offline</div>
+        <p style="font-size:0.85rem;color:var(--muted);margin-bottom:1rem">Data is stored locally in SQLite. Sync queue shows pending operations.</p>
+        <div class="form-group"><label class="form-label">Reference</label>
+          <input class="form-control" id="demo-ref" placeholder="OFFLINE-001"/></div>
+        <div class="form-group"><label class="form-label">Client Name</label>
+          <input class="form-control" id="demo-client" placeholder="Test Client Ltd"/></div>
+        <div class="form-row">
+          <div class="form-group"><label class="form-label">Origin</label>
+            <input class="form-control" id="demo-origin" value="Maseru Bridge"/></div>
+          <div class="form-group"><label class="form-label">Destination</label>
+            <input class="form-control" id="demo-dest" value="Johannesburg"/></div>
+        </div>
+        <button class="btn btn-primary" onclick="registerOffline()">Register (while offline)</button>
+        <div id="demo-reg-alert" class="alert" style="margin-top:0.75rem"></div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-title">Step 3 — Verify sync queue then restore</div>
+      <div style="display:flex;gap:0.75rem;flex-wrap:wrap;align-items:center">
+        <button class="btn btn-outline" onclick="checkSyncQueue()">Check Sync Queue</button>
+        <span id="sync-queue-result" style="font-family:'DM Mono',monospace;font-size:0.85rem;color:var(--amber)"></span>
+      </div>
+      <p style="font-size:0.82rem;color:var(--muted);margin-top:0.75rem">After restoring connection, wait ~15 seconds. The auto-sync worker picks up pending operations. Each operation has a unique <span style="font-family:'DM Mono',monospace;color:var(--accent2)">operation_id</span> — sending the same operation twice is safe (idempotency). Last-Write-Wins resolves conflicts.</p>
+    </div>
+    <div class="card">
+      <div class="card-title">Correctness argument</div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:0.75rem;margin-top:0.5rem">
+        <div style="background:var(--bg3);border-radius:8px;padding:0.9rem">
+          <div style="font-size:0.75rem;color:var(--accent2);font-family:'DM Mono',monospace;margin-bottom:0.3rem">AVAILABILITY</div>
+          <div style="font-size:0.82rem">Sites accept writes while disconnected — AP from CAP theorem</div>
+        </div>
+        <div style="background:var(--bg3);border-radius:8px;padding:0.9rem">
+          <div style="font-size:0.75rem;color:var(--green);font-family:'DM Mono',monospace;margin-bottom:0.3rem">IDEMPOTENCY</div>
+          <div style="font-size:0.82rem">operation_id prevents duplicate processing on retry</div>
+        </div>
+        <div style="background:var(--bg3);border-radius:8px;padding:0.9rem">
+          <div style="font-size:0.75rem;color:var(--amber);font-family:'DM Mono',monospace;margin-bottom:0.3rem">CONFLICT RESOLUTION</div>
+          <div style="font-size:0.82rem">Last Write Wins using version counter + timestamp tiebreak</div>
+        </div>
+        <div style="background:var(--bg3);border-radius:8px;padding:0.9rem">
+          <div style="font-size:0.75rem;color:var(--purple);font-family:'DM Mono',monospace;margin-bottom:0.3rem">RECOVERY</div>
+          <div style="font-size:0.82rem">Auto-sync worker retries every 10s when connectivity restored</div>
+        </div>
+      </div>
+    </div>`;
+}
+
+async function goOffline() {
+  const site = document.getElementById('demo-site').value;
+  try {
+    await api(site, '/demo/go-offline', 'POST');
+    document.getElementById('offline-banner').classList.add('show');
+    document.getElementById('offline-site-name').textContent = site.charAt(0).toUpperCase()+site.slice(1)+' Post';
+    document.getElementById('online-badge').style.background = 'rgba(239,68,68,0.1)';
+    document.getElementById('online-badge').style.borderColor = 'rgba(239,68,68,0.3)';
+    document.getElementById('online-badge').style.color = 'var(--red)';
+    document.getElementById('online-badge').querySelector('.dot').style.background = 'var(--red)';
+    document.getElementById('online-text').textContent = site+' OFFLINE';
+    showAlert('demo-alert', site+' is now offline. Operations will queue locally.','success');
+  } catch(e) { showAlert('demo-alert','Cannot reach '+site,'error'); }
+}
+
+async function goOnline() {
+  const site = document.getElementById('demo-site').value;
+  try {
+    await api(site, '/demo/go-online', 'POST');
+    document.getElementById('offline-banner').classList.remove('show');
+    document.getElementById('online-badge').style.cssText='';
+    document.getElementById('online-text').textContent = 'Online';
+    showAlert('demo-alert', site+' is back online. Sync will resume in ~10 seconds.','success');
+  } catch(e) { showAlert('demo-alert','Cannot reach '+site,'error'); }
+}
+
+async function registerOffline() {
+  const site = document.getElementById('demo-site').value;
+  const body = { 
+    reference: document.getElementById('demo-ref').value||'OFFLINE-'+Date.now(),
+    client_name: document.getElementById('demo-client').value||'Offline Client',
+    origin: document.getElementById('demo-origin')?.value||'Maseru Bridge',
+    destination: document.getElementById('demo-dest')?.value||'Johannesburg'
+  };
+  try {
+    const r = await api(site, '/containers', 'POST', body);
+    if (r.container) showAlert('demo-reg-alert','Registered locally! Will sync when online.','success');
+    else showAlert('demo-reg-alert', r.detail||'Error','error');
+  } catch(e) { showAlert('demo-reg-alert','Connection failed','error'); }
+}
+
+async function checkSyncQueue() {
+  const site = document.getElementById('demo-site').value;
+  try {
+    const s = await api(site, '/sync/status');
+    document.getElementById('sync-queue-result').textContent = `${s.pending_sync} operations pending sync`;
+  } catch(e) { document.getElementById('sync-queue-result').textContent = 'Cannot reach site'; }
+}
+
+// TRACK (Client)
+function renderTrack(el) {
+  el.innerHTML = `
+    <div class="page-header"><h2>Track Container</h2><p>Read-only container tracking</p></div>
+    <div class="card" style="max-width:500px">
+      <div style="display:flex;gap:0.75rem">
+        <input class="form-control" id="track-id" placeholder="Paste container ID..."/>
+        <button class="btn btn-primary" onclick="doTrack()">Track</button>
+      </div>
+    </div>
+    <div id="track-result"></div>`;
+}
+
+async function doTrack() {
+  const id = document.getElementById('track-id').value.trim();
+  if (!id) return;
+  const el = document.getElementById('track-result');
+  el.innerHTML = '<div class="card"><p style="color:var(--muted)">Loading...</p></div>';
+  try {
+    const data = await api('control_tower', `/containers/${id}/timeline`);
+    el.innerHTML = `
+      <div class="card">
+        <div style="display:flex;justify-content:space-between;align-items:start;margin-bottom:1rem">
+          <div>
+            <div style="font-family:'Syne',sans-serif;font-size:1.1rem;font-weight:700">${data.container.reference}</div>
+            <div style="color:var(--muted);font-size:0.85rem">${data.container.client_name} · ${data.container.origin} → ${data.container.destination}</div>
+          </div>
+          ${statusBadge(data.container.status)}
+        </div>
+        <div class="card-title">Journey Timeline</div>
+        <div class="timeline">
+          ${data.milestones.map(m=>`
+            <div class="tl-item">
+              <div class="tl-dot ${m.event_type.includes('CLEAR')||m.event_type.includes('DELIVER')?'green':m.event_type.includes('INCIDENT')?'red':''}"></div>
+              <div class="tl-event">${m.event_type.replace(/_/g,' ')}</div>
+              <div class="tl-meta">${m.description||''} · ${siteName(m.site_id)} · ${(m.created_at||'').substring(0,16).replace('T',' ')}</div>
+            </div>`).join('') || '<p style="color:var(--muted)">No milestones recorded yet</p>'}
+        </div>
+        ${data.incidents.length>0?`
+          <div class="card-title" style="margin-top:1rem">Incidents</div>
+          ${data.incidents.map(i=>`<div style="padding:0.5rem 0;border-bottom:1px solid var(--border)">
+            <span class="badge badge-red">${i.incident_type}</span>
+            <span style="font-size:0.82rem;margin-left:0.5rem">${i.description}</span>
+          </div>`).join('')}`:''}
+      </div>`;
+  } catch(e) { el.innerHTML = '<div class="card"><p style="color:var(--red)">Container not found or Control Tower unreachable</p></div>'; }
+}
+
+// TIMELINE MODAL
+async function viewTimeline(id, ref) {
+  document.getElementById('modal-title').textContent = 'Timeline — ' + ref;
+  document.getElementById('modal-body').innerHTML = '<p style="color:var(--muted)">Loading...</p>';
+  document.getElementById('modal').classList.add('show');
+  try {
+    const site = currentRole==='management'||currentRole==='client' ? 'control_tower' : currentSite;
+    const data = await api(site, `/containers/${id}/timeline`);
+    document.getElementById('modal-body').innerHTML = `
+      <div style="margin-bottom:1rem;display:flex;gap:0.75rem;align-items:center">
+        ${statusBadge(data.container.status)}
+        <span style="font-size:0.85rem;color:var(--muted)">${data.container.client_name} · ${data.container.origin} → ${data.container.destination}</span>
+      </div>
+      <div class="timeline">
+        ${data.milestones.map(m=>`
+          <div class="tl-item">
+            <div class="tl-dot ${m.event_type.includes('CLEAR')||m.event_type.includes('DELIVER')?'green':''}"></div>
+            <div class="tl-event">${m.event_type.replace(/_/g,' ')}</div>
+            <div class="tl-meta">${m.description||''} · ${siteName(m.site_id)} · ${(m.created_at||'').substring(0,16).replace('T',' ')}</div>
+          </div>`).join('') || '<p style="color:var(--muted)">No milestones yet</p>'}
+      </div>
+      ${data.trips.length>0?`<div style="margin-top:1rem"><div class="card-title">Trips</div>
+        ${data.trips.map(t=>`<div class="sync-row"><span>${t.driver_name} · ${t.vehicle_reg}</span><span style="color:var(--muted);font-size:0.8rem">${siteName(t.from_site)} → ${siteName(t.to_site)}</span></div>`).join('')}</div>`:''}
+      ${data.incidents.length>0?`<div style="margin-top:1rem"><div class="card-title">Incidents</div>
+        ${data.incidents.map(i=>`<div class="sync-row"><span class="badge badge-red">${i.incident_type}</span><span style="font-size:0.82rem;margin-left:0.5rem">${i.description}</span></div>`).join('')}</div>`:''}`;
+  } catch(e) { document.getElementById('modal-body').innerHTML = '<p style="color:var(--red)">Cannot load timeline</p>'; }
+}
+
+function closeModal() { document.getElementById('modal').classList.remove('show'); }
+
+// Load containers from ALL sites + control tower (merged, deduped)
+async function loadAllContainers(site) {
+  const allSites = ['depot','border','port','hub','control_tower'];
+  const results = await Promise.allSettled(allSites.map(s => api(s, '/containers')));
+  const seen = new Set();
+  const all = [];
+  results.forEach(r => {
+    if (r.status === 'fulfilled' && Array.isArray(r.value)) {
+      r.value.forEach(c => {
+        if (!seen.has(c.id)) { seen.add(c.id); all.push(c); }
+      });
+    }
+  });
+  // Sort by most recently updated
+  all.sort((a,b) => (b.updated_at||'').localeCompare(a.updated_at||''));
+  return all;
+}
+
+async function loadInitialData() {
+  // Auto-refresh every 5 minutes - only for read-only panels, not forms
+  const FORM_PANELS = ['register','assign_trip','gate_ops','incidents','clearance','handover','vessel_ops','milestones','update_status','offline_demo','track'];
+  setInterval(() => {
+    const activePanel = document.querySelector('.panel.active');
+    if (!activePanel) return;
+    const id = activePanel.id.replace('panel-','');
+    if (!FORM_PANELS.includes(id)) {
+      renderPanel(id, activePanel);
+    }
+  }, 300000); // 5 minutes
+}
+
+// Vehicle registry - just reg numbers, no pre-assigned drivers
+function getAllVehicles() {
+  try {
+    return JSON.parse(localStorage.getItem('bf_vehicles') || '[]');
+  } catch(e) { return []; }
+}
+
+function saveVehicle(reg) {
+  try {
+    const saved = getAllVehicles();
+    if (!saved.includes(reg)) {
+      saved.push(reg);
+      localStorage.setItem('bf_vehicles', JSON.stringify(saved));
+    }
+  } catch(e) {}
+}
+
+// Build vehicle dropdown HTML
+function vehicleDropdown(regId, driverInputId) {
+  const vehicles = getAllVehicles();
+  return `
+    <div>
+      <label class="form-label">Vehicle Registration *</label>
+      <select class="form-control" id="${regId}" onchange="handleVehicleSelect('${regId}')">
+        <option value="">Select registered vehicle...</option>
+        ${vehicles.map(v=>`<option value="${v}">${v}</option>`).join('')}
+        <option value="__custom__">+ Register new vehicle...</option>
+      </select>
+      <div id="${regId}-custom" style="display:none;margin-top:0.5rem">
+        <label class="form-label">New Vehicle Reg Number</label>
+        <input class="form-control" id="${regId}-custom-input" placeholder="e.g. LSO-1234-AA"/>
+        <button type="button" class="btn btn-outline btn-sm" style="margin-top:0.4rem" onclick="addNewVehicle('${regId}')">Save Vehicle</button>
+      </div>
+    </div>`;
+}
+
+function handleVehicleSelect(regId) {
+  const val = document.getElementById(regId).value;
+  const customDiv = document.getElementById(regId + '-custom');
+  if (val === '__custom__') {
+    if (customDiv) customDiv.style.display = 'block';
+  } else {
+    if (customDiv) customDiv.style.display = 'none';
+  }
+}
+
+function addNewVehicle(regId) {
+  const input = document.getElementById(regId + '-custom-input');
+  const reg = input.value.trim().toUpperCase();
+  if (!reg) return;
+  saveVehicle(reg);
+  // Add to dropdown and select it
+  const sel = document.getElementById(regId);
+  const opt = document.createElement('option');
+  opt.value = reg; opt.textContent = reg;
+  sel.insertBefore(opt, sel.lastElementChild);
+  sel.value = reg;
+  document.getElementById(regId + '-custom').style.display = 'none';
+}
+
+function getVehicleReg(regId) {
+  const val = document.getElementById(regId).value;
+  if (val === '__custom__') {
+    return document.getElementById(regId + '-custom-input').value.trim().toUpperCase();
+  }
+  return val;
+}
+</script>
+</body>
+</html>

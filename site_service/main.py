@@ -123,7 +123,10 @@ async def sync_worker():
     """Periodically push pending changes to Control Tower."""
     import json
     while True:
-        await asyncio.sleep(10)  # try every 10 seconds
+        await asyncio.sleep(10)
+        if not _online:
+            print(f"[{SITE_ID}] OFFLINE - sync paused")
+            continue
         try:
             conn = get_db()
             pending = conn.execute(
